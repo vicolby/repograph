@@ -1,13 +1,16 @@
-import type { StartedNeo4jContainer } from "@testcontainers/neo4j";
 import type { Driver } from "neo4j-driver";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createRepographServer } from "../src/mcp/server.js";
-import { closeNeo4jDriver, createNeo4jDriver } from "../src/neo4j/driver.js";
 import { addRepo } from "../src/repos/addRepo.js";
 import { normalizeRepoIdentifier } from "../src/repos/normalize.js";
-import { startTestNeo4j } from "./setup/neo4j-test-container.js";
-
-const DATABASE = "neo4j";
+import {
+  clearDb,
+  countRepos,
+  startGraph,
+  stopGraph,
+  TEST_DATABASE,
+  type TestGraph,
+} from "./setup/graph-fixture.js";
 
 describe("normalizeRepoIdentifier", () => {
   it("resolves SSH, HTTPS, and plain path to the same path", () => {
@@ -28,45 +31,24 @@ describe("normalizeRepoIdentifier", () => {
 });
 
 describe("add_repo (real Neo4j)", () => {
-  let container: StartedNeo4jContainer;
+  let graph: TestGraph;
   let driver: Driver;
 
   beforeAll(async () => {
-    container = await startTestNeo4j();
-    driver = createNeo4jDriver({
-      uri: container.getBoltUri(),
-      user: container.getUsername(),
-      password: container.getPassword(),
-      database: DATABASE,
-    });
+    graph = await startGraph();
+    driver = graph.driver;
   });
 
   afterAll(async () => {
-    if (driver) await closeNeo4jDriver(driver);
-    if (container) await container.stop();
+    await stopGraph(graph);
   });
 
   beforeEach(async () => {
-    const session = driver.session({ database: DATABASE });
-    try {
-      await session.run("MATCH (n) DETACH DELETE n");
-    } finally {
-      await session.close();
-    }
+    await clearDb(driver, TEST_DATABASE);
   });
 
-  async function countRepos(): Promise<number> {
-    const session = driver.session({ database: DATABASE });
-    try {
-      const result = await session.run("MATCH (r:Repo) RETURN count(r) AS count");
-      return (result.records[0]?.get("count") as { toNumber: () => number }).toNumber();
-    } finally {
-      await session.close();
-    }
-  }
-
   it("creates a Repo node with path, url, type, description", async () => {
-    const node = await addRepo(driver, DATABASE, {
+    const node = await addRepo(driver, TEST_DATABASE, {
       repo: "https://gitlab.com/group/project.git",
       type: "service",
       description: "Billing API",
@@ -76,16 +58,16 @@ describe("add_repo (real Neo4j)", () => {
     expect(node.url).toBe("https://gitlab.com/group/project");
     expect(node.type).toBe("service");
     expect(node.description).toBe("Billing API");
-    await expect(countRepos()).resolves.toBe(1);
+    await expect(countRepos(driver, TEST_DATABASE)).resolves.toBe(1);
   });
 
   it("upserts: second call for the same repo updates fields instead of duplicating", async () => {
-    await addRepo(driver, DATABASE, {
+    await addRepo(driver, TEST_DATABASE, {
       repo: "group/project",
       type: "service",
       description: "v1",
     });
-    const updated = await addRepo(driver, DATABASE, {
+    const updated = await addRepo(driver, TEST_DATABASE, {
       repo: "https://gitlab.com/group/project",
       description: "v2",
     });
@@ -94,20 +76,20 @@ describe("add_repo (real Neo4j)", () => {
     // Only the passed field changes; type is preserved.
     expect(updated.description).toBe("v2");
     expect(updated.type).toBe("service");
-    await expect(countRepos()).resolves.toBe(1);
+    await expect(countRepos(driver, TEST_DATABASE)).resolves.toBe(1);
   });
 
   it("resolves SSH URL, HTTPS URL, and plain path to the same node", async () => {
-    await addRepo(driver, DATABASE, { repo: "git@gitlab.com:group/sub/project.git", type: "service" });
-    await addRepo(driver, DATABASE, { repo: "https://gitlab.com/group/sub/project.git" });
-    const node = await addRepo(driver, DATABASE, { repo: "group/sub/project" });
+    await addRepo(driver, TEST_DATABASE, { repo: "git@gitlab.com:group/sub/project.git", type: "service" });
+    await addRepo(driver, TEST_DATABASE, { repo: "https://gitlab.com/group/sub/project.git" });
+    const node = await addRepo(driver, TEST_DATABASE, { repo: "group/sub/project" });
 
     expect(node.path).toBe("group/sub/project");
-    await expect(countRepos()).resolves.toBe(1);
+    await expect(countRepos(driver, TEST_DATABASE)).resolves.toBe(1);
   });
 
   it("accepts arbitrary type strings without code changes", async () => {
-    const node = await addRepo(driver, DATABASE, {
+    const node = await addRepo(driver, TEST_DATABASE, {
       repo: "group/novel-thing",
       type: "quantum-widget-frobnicator",
     });
@@ -116,7 +98,7 @@ describe("add_repo (real Neo4j)", () => {
   });
 
   it("is registered as an MCP tool on the server", async () => {
-    const server = createRepographServer({ driver, database: DATABASE });
+    const server = createRepographServer({ driver, database: TEST_DATABASE });
     const tools = (server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools;
     expect(Object.keys(tools)).toContain("add_repo");
   });
