@@ -10,8 +10,7 @@ own machine. The code lives at https://github.com/vicolby/repograph.
 ## What's here (project scaffold)
 
 - `docker-compose.yml` — Neo4j Community Edition, reachable over Bolt.
-- `src/config.ts` — reads Neo4j connection settings from environment variables.
-- `src/neo4j/driver.ts` — shared Neo4j driver module used by the server (and later, its tools).
+- `src/bootstrap.ts` — reads Neo4j connection settings from environment variables and owns the shared driver module used by the server (and its tools).
 - `src/mcp/server.ts` / `src/index.ts` — an MCP server that speaks stdio, with
   four tools: `add_repo`, `add_relation`, `get_related_repos`, and
   `search_repos`.
