@@ -71,3 +71,17 @@ export function optionalIntInRange(
   }
   return value;
 }
+
+/** Validates an optional boolean field; returns `defaultValue` when omitted. */
+export function optionalBoolean(
+  value: boolean | undefined,
+  tool: string,
+  field: string,
+  defaultValue: boolean,
+): boolean {
+  if (value === undefined) return defaultValue;
+  if (typeof value !== "boolean") {
+    throw new Error(`${tool} field ${JSON.stringify(field)} must be a boolean when provided`);
+  }
+  return value;
+}

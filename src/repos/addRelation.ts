@@ -23,6 +23,10 @@ export type RelationEdge = {
   evidence: string[];
   created_by: string | null;
   created_at: string;
+  /** ISO timestamp of the soft delete; null while the edge is current. */
+  superseded_at: string | null;
+  /** Who/what superseded the edge; null while the edge is current. */
+  superseded_by: string | null;
 };
 
 function mapRelationEdge(record: Neo4jRecord): RelationEdge {
@@ -33,6 +37,8 @@ function mapRelationEdge(record: Neo4jRecord): RelationEdge {
     evidence: (record.get("evidence") as string[] | null) ?? [],
     created_by: (record.get("created_by") as string | null) ?? null,
     created_at: record.get("created_at") as string,
+    superseded_at: (record.get("superseded_at") as string | null) ?? null,
+    superseded_by: (record.get("superseded_by") as string | null) ?? null,
   };
 }
 
@@ -46,7 +52,8 @@ function mapRelationEdge(record: Neo4jRecord): RelationEdge {
  *   new types without schema/code changes.
  * - Existing triple: appends the new `evidence` to the edge's list and
  *   refreshes `created_at`, never duplicating the edge. `created_by` is
- *   updated only when a new value is passed.
+ *   updated only when a new value is passed. A previously superseded edge
+ *   is revived (its `superseded_at`/`superseded_by` markers are cleared).
  * - Both endpoints must already exist (via `add_repo`); otherwise throws.
  */
 export async function addRelation(
@@ -81,13 +88,17 @@ export async function addRelation(
     const result = await session.run(
       `MATCH (a:Repo {path: $fromPath}), (b:Repo {path: $toPath})
        MERGE (a)-[r:RELATES {type: $type}]->(b)
-       ON CREATE SET r.evidence = $evidence, r.created_by = $createdBy, r.created_at = $now
+       ON CREATE SET r.evidence = $evidence, r.created_by = $createdBy, r.created_at = $now,
+         r.superseded_at = NULL, r.superseded_by = NULL
        ON MATCH SET
          r.evidence = coalesce(r.evidence, []) + $evidence,
          r.created_by = CASE WHEN $createdBy IS NOT NULL THEN $createdBy ELSE r.created_by END,
-         r.created_at = $now
+         r.created_at = $now,
+         r.superseded_at = NULL,
+         r.superseded_by = NULL
        RETURN a.path AS from, b.path AS to, r.type AS type,
-         r.evidence AS evidence, r.created_by AS created_by, r.created_at AS created_at`,
+         r.evidence AS evidence, r.created_by AS created_by, r.created_at AS created_at,
+         r.superseded_at AS superseded_at, r.superseded_by AS superseded_by`,
       { fromPath, toPath, type, evidence, createdBy, now },
     );
     const record = result.records[0];

@@ -1,7 +1,7 @@
 import type { Driver } from "neo4j-driver";
 import type { RepoNode } from "./addRepo.js";
 import { mapRepoNode, withSession } from "./db.js";
-import { optionalIntInRange, optionalText, resolveRepoPath } from "./input.js";
+import { optionalBoolean, optionalIntInRange, optionalText, resolveRepoPath } from "./input.js";
 // Internal to the src/repos/ module (see store.ts): do not import from outside src/repos/.
 
 export type GetRelatedReposInput = {
@@ -15,6 +15,12 @@ export type GetRelatedReposInput = {
   depth?: number | undefined;
   /** When provided, only traverses edges whose free-text `type` equals this value. */
   type?: string | null | undefined;
+  /**
+   * When true, traverses superseded (soft-deleted) edges as well.
+   * Defaults to false: retracted relations stay in the graph as history
+   * but are hidden from traversal.
+   */
+  include_superseded?: boolean | undefined;
 };
 
 const DEFAULT_DEPTH = 1;
@@ -29,6 +35,9 @@ const MAX_DEPTH = 10;
  * - `depth` widens the traversal (`*1..depth` hops, undirected).
  * - `type` restricts traversal to edges whose `type` property equals the
  *   given free-text value (every hop must match).
+ * - Superseded edges (retracted via `supersede_relation`) are skipped
+ *   unless `include_superseded` is true. Multi-hop paths are hidden when
+ *   any hop traverses a superseded edge.
  * - Results are deduplicated, ordered by `path`, and never include the
  *   start repo itself (even when a cycle leads back to it).
  * - Throws when the start repo does not exist yet (call `add_repo` first),
@@ -49,6 +58,12 @@ export async function getRelatedRepos(
     DEFAULT_DEPTH,
   );
   const typeFilter = optionalText(input.type, "get_related_repos", "type");
+  const includeSuperseded = optionalBoolean(
+    input.include_superseded,
+    "get_related_repos",
+    "include_superseded",
+    false,
+  );
 
   return withSession(driver, database, async (session) => {
     const exists = await session.run(
@@ -64,12 +79,23 @@ export async function getRelatedRepos(
 
     // `depth` is a validated integer, so interpolating it into the
     // variable-length pattern is safe (Cypher has no parameter for it).
-    const typePredicate =
-      typeFilter === null ? "" : " AND all(r IN rels WHERE r.type = $typeFilter)";
+    // Superseded edges carry `superseded_at`; old edges created before the
+    // soft-delete feature have no such property, and `IS NULL` matches both.
+    const predicates: string[] = [];
+    if (!includeSuperseded) {
+      predicates.push("all(r IN rels WHERE r.superseded_at IS NULL)");
+    }
+    if (typeFilter !== null) {
+      predicates.push("all(r IN rels WHERE r.type = $typeFilter)");
+    }
+    const whereClause =
+      predicates.length > 0
+        ? `WHERE neighbor.path <> $repoPath AND ${predicates.join(" AND ")}`
+        : "WHERE neighbor.path <> $repoPath";
     const result = await session.run(
       `MATCH (start:Repo {path: $repoPath})
        MATCH (start)-[rels:RELATES*1..${depth}]-(neighbor:Repo)
-       WHERE neighbor.path <> $repoPath${typePredicate}
+       ${whereClause}
        RETURN DISTINCT neighbor.path AS path, neighbor.url AS url,
          neighbor.type AS type, neighbor.description AS description
        ORDER BY neighbor.path ASC`,

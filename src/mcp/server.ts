@@ -95,6 +95,41 @@ const toolDefs = [
       }),
   }),
   defineTool({
+    name: "supersede_relation",
+    description:
+      "Retract a repository relation without losing its history. Marks the directed edge for the " +
+      "(from, to, type) triple as superseded (sets superseded_at/superseded_by) instead of deleting " +
+      "it, so the evidence trail survives. Superseded edges are hidden from get_related_repos by " +
+      "default. Re-recording the same triple via add_relation revives the edge. from/to accept a " +
+      "git remote URL (SSH or HTTPS) or an already-normalized path (group/subgroup/project).",
+    inputSchema: z.object({
+      from: z
+        .string()
+        .min(1)
+        .describe(
+          "Source repository: git remote URL (SSH or HTTPS) or GitLab full path (group/subgroup/project)",
+        ),
+      to: z
+        .string()
+        .min(1)
+        .describe(
+          "Target repository: git remote URL (SSH or HTTPS) or GitLab full path (group/subgroup/project)",
+        ),
+      type: z.string().min(1).describe("Free-text relation type, must match the edge exactly"),
+      superseded_by: z
+        .string()
+        .optional()
+        .describe("Who/what superseded the relation, e.g. a citation like 'infra.md rewired a -> c'"),
+    }),
+    invoke: (store, args) =>
+      store.supersedeRelation({
+        from: args.from,
+        to: args.to,
+        type: args.type,
+        superseded_by: args.superseded_by,
+      }),
+  }),
+  defineTool({
     name: "get_related_repos",
     description:
       "List repositories connected to the given one, traversing RELATES edges in both directions " +
@@ -119,9 +154,20 @@ const toolDefs = [
         .string()
         .optional()
         .describe("Only traverse edges whose relation type equals this value"),
+      include_superseded: z
+        .boolean()
+        .optional()
+        .describe(
+          "When true, traverse superseded (retracted) edges as well; default false hides history",
+        ),
     }),
     invoke: (store, args) =>
-      store.getRelatedRepos({ repo: args.repo, depth: args.depth, type: args.type }),
+      store.getRelatedRepos({
+        repo: args.repo,
+        depth: args.depth,
+        type: args.type,
+        include_superseded: args.include_superseded,
+      }),
   }),
   defineTool({
     name: "search_repos",
