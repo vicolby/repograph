@@ -1,5 +1,5 @@
-import type { Driver, Record as Neo4jRecord } from "neo4j-driver";
-import { ensureRepoConstraints, withSession } from "./db.js";
+import type { Driver } from "neo4j-driver";
+import { ensureRepoConstraints, ensureReposExist, mapRelationEdge, withSession } from "./db.js";
 // Internal to the src/repos/ module (see store.ts): do not import from outside src/repos/.
 import { optionalText, requiredText, requiredTextList, resolveRepoPath } from "./input.js";
 
@@ -29,19 +29,6 @@ export type RelationEdge = {
   superseded_by: string | null;
 };
 
-function mapRelationEdge(record: Neo4jRecord): RelationEdge {
-  return {
-    from: record.get("from") as string,
-    to: record.get("to") as string,
-    type: record.get("type") as string,
-    evidence: (record.get("evidence") as string[] | null) ?? [],
-    created_by: (record.get("created_by") as string | null) ?? null,
-    created_at: record.get("created_at") as string,
-    superseded_at: (record.get("superseded_at") as string | null) ?? null,
-    superseded_by: (record.get("superseded_by") as string | null) ?? null,
-  };
-}
-
 /**
  * Creates a relation edge between two existing repos, or accumulates onto
  * the existing one (keyed on the `(from, to, type)` triple).
@@ -70,20 +57,7 @@ export async function addRelation(
 
   return withSession(driver, database, async (session) => {
     await ensureRepoConstraints(session);
-
-    const endpoints = await session.run(
-      `OPTIONAL MATCH (a:Repo {path: $fromPath})
-       OPTIONAL MATCH (b:Repo {path: $toPath})
-       RETURN a IS NOT NULL AS fromExists, b IS NOT NULL AS toExists`,
-      { fromPath, toPath },
-    );
-    const row = endpoints.records[0];
-    if (row?.get("fromExists") !== true) {
-      throw new Error(`add_relation: repo not found: ${JSON.stringify(fromPath)} (call add_repo first)`);
-    }
-    if (row?.get("toExists") !== true) {
-      throw new Error(`add_relation: repo not found: ${JSON.stringify(toPath)} (call add_repo first)`);
-    }
+    await ensureReposExist(session, fromPath, toPath, "add_relation");
 
     const result = await session.run(
       `MATCH (a:Repo {path: $fromPath}), (b:Repo {path: $toPath})

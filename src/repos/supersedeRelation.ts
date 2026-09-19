@@ -1,6 +1,6 @@
-import type { Driver, Record as Neo4jRecord } from "neo4j-driver";
+import type { Driver } from "neo4j-driver";
 import type { RelationEdge } from "./addRelation.js";
-import { ensureRepoConstraints, withSession } from "./db.js";
+import { ensureRepoConstraints, ensureReposExist, mapRelationEdge, withSession } from "./db.js";
 // Internal to the src/repos/ module (see store.ts): do not import from outside src/repos/.
 import { optionalText, requiredText, resolveRepoPath } from "./input.js";
 
@@ -17,19 +17,6 @@ export type SupersedeRelationInput = {
    */
   superseded_by?: string | null | undefined;
 };
-
-function mapSupersededEdge(record: Neo4jRecord): RelationEdge {
-  return {
-    from: record.get("from") as string,
-    to: record.get("to") as string,
-    type: record.get("type") as string,
-    evidence: (record.get("evidence") as string[] | null) ?? [],
-    created_by: (record.get("created_by") as string | null) ?? null,
-    created_at: record.get("created_at") as string,
-    superseded_at: (record.get("superseded_at") as string | null) ?? null,
-    superseded_by: (record.get("superseded_by") as string | null) ?? null,
-  };
-}
 
 /**
  * Soft-deletes a relation edge by marking it superseded instead of removing
@@ -57,24 +44,7 @@ export async function supersedeRelation(
 
   return withSession(driver, database, async (session) => {
     await ensureRepoConstraints(session);
-
-    const endpoints = await session.run(
-      `OPTIONAL MATCH (a:Repo {path: $fromPath})
-       OPTIONAL MATCH (b:Repo {path: $toPath})
-       RETURN a IS NOT NULL AS fromExists, b IS NOT NULL AS toExists`,
-      { fromPath, toPath },
-    );
-    const row = endpoints.records[0];
-    if (row?.get("fromExists") !== true) {
-      throw new Error(
-        `supersede_relation: repo not found: ${JSON.stringify(fromPath)} (call add_repo first)`,
-      );
-    }
-    if (row?.get("toExists") !== true) {
-      throw new Error(
-        `supersede_relation: repo not found: ${JSON.stringify(toPath)} (call add_repo first)`,
-      );
-    }
+    await ensureReposExist(session, fromPath, toPath, "supersede_relation");
 
     const result = await session.run(
       `MATCH (a:Repo {path: $fromPath})-[r:RELATES {type: $type}]->(b:Repo {path: $toPath})
@@ -91,6 +61,6 @@ export async function supersedeRelation(
         `supersede_relation: relation not found: ${JSON.stringify(fromPath)} -> ${JSON.stringify(toPath)} ${JSON.stringify(type)}`,
       );
     }
-    return mapSupersededEdge(record);
+    return mapRelationEdge(record);
   });
 }

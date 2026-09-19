@@ -1,6 +1,6 @@
 import type { Driver } from "neo4j-driver";
 import type { RepoNode } from "./addRepo.js";
-import { mapRepoNode, withSession } from "./db.js";
+import { ensureRepoExists, mapRepoNode, withSession } from "./db.js";
 import { optionalBoolean, optionalIntInRange, optionalText, resolveRepoPath } from "./input.js";
 // Internal to the src/repos/ module (see store.ts): do not import from outside src/repos/.
 
@@ -66,16 +66,7 @@ export async function getRelatedRepos(
   );
 
   return withSession(driver, database, async (session) => {
-    const exists = await session.run(
-      `OPTIONAL MATCH (s:Repo {path: $repoPath})
-       RETURN s IS NOT NULL AS exists`,
-      { repoPath },
-    );
-    if (exists.records[0]?.get("exists") !== true) {
-      throw new Error(
-        `get_related_repos: repo not found: ${JSON.stringify(repoPath)} (call add_repo first)`,
-      );
-    }
+    await ensureRepoExists(session, repoPath, "get_related_repos");
 
     // `depth` is a validated integer, so interpolating it into the
     // variable-length pattern is safe (Cypher has no parameter for it).
