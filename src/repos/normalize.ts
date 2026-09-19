@@ -13,7 +13,7 @@ const DEFAULT_HOST = "gitlab.com";
 
 /** Strips a single trailing `.git` suffix (case-insensitive). */
 function stripGitSuffix(value: string): string {
-  return value.endsWith(".git") ? value.slice(0, -".git".length) : value;
+  return value.toLowerCase().endsWith(".git") ? value.slice(0, -".git".length) : value;
 }
 
 function cleanPath(rawPath: string): string {
