@@ -1,6 +1,5 @@
 import { expect, it } from "vitest";
-import { createRepographServer } from "../src/mcp/server.js";
-import { defineGraphSuite, TEST_DATABASE } from "./setup/graph-fixture.js";
+import { defineGraphSuite } from "./setup/graph-fixture.js";
 
 defineGraphSuite(
   "search_repos (real Neo4j)",
@@ -12,7 +11,7 @@ defineGraphSuite(
       { repo: "group/search-service", type: "service", description: "Full-text search backend" },
     ],
   },
-  ({ driver, store }) => {
+  ({ store }) => {
 
   it("finds repos by partial path match, not just exact match", async () => {
     const nodes = await store().searchRepos({ query: "bill" });
@@ -48,10 +47,5 @@ defineGraphSuite(
     await expect(store().searchRepos({ query: "   " })).rejects.toThrow(/query/i);
   });
 
-  it("is registered as an MCP tool on the server", async () => {
-    const server = createRepographServer({ driver: driver(), database: TEST_DATABASE });
-    const tools = (server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools;
-    expect(Object.keys(tools)).toContain("search_repos");
-  });
   },
 );

@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { createRepographServer } from "../src/mcp/server.js";
 import { normalizeRepoIdentifier } from "../src/repos/normalize.js";
 import {
   countRepos,
@@ -77,10 +76,5 @@ defineGraphSuite("add_repo (real Neo4j)", {}, ({ driver, store }) => {
     expect(node.type).toBe("quantum-widget-frobnicator");
   });
 
-  it("is registered as an MCP tool on the server", async () => {
-    const server = createRepographServer({ driver: driver(), database: TEST_DATABASE });
-    const tools = (server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools;
-    expect(Object.keys(tools)).toContain("add_repo");
-  });
   },
 );

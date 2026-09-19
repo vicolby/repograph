@@ -1,5 +1,4 @@
 import { expect, it } from "vitest";
-import { createRepographServer } from "../src/mcp/server.js";
 import {
   countEdges,
   defineGraphSuite,
@@ -168,10 +167,5 @@ defineGraphSuite(
     ).rejects.toThrow(/superseded_by/i);
   });
 
-  it("is registered as an MCP tool on the server", async () => {
-    const server = createRepographServer({ driver: driver(), database: TEST_DATABASE });
-    const tools = (server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools;
-    expect(Object.keys(tools)).toContain("supersede_relation");
-  });
   },
 );

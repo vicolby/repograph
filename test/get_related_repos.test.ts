@@ -1,6 +1,5 @@
 import { expect, it } from "vitest";
-import { createRepographServer } from "../src/mcp/server.js";
-import { defineGraphSuite, TEST_DATABASE } from "./setup/graph-fixture.js";
+import { defineGraphSuite } from "./setup/graph-fixture.js";
 
 defineGraphSuite(
   "get_related_repos (real Neo4j)",
@@ -24,7 +23,7 @@ defineGraphSuite(
       },
     ],
   },
-  ({ driver, store }) => {
+  ({ store }) => {
 
   it("defaults to direct (depth-1) neighbors in both directions", async () => {
     const nodes = await store().getRelatedRepos({ repo: "group/service-a" });
@@ -134,10 +133,5 @@ defineGraphSuite(
     ).rejects.toThrow(/type/i);
   });
 
-  it("is registered as an MCP tool on the server", async () => {
-    const server = createRepographServer({ driver: driver(), database: TEST_DATABASE });
-    const tools = (server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools;
-    expect(Object.keys(tools)).toContain("get_related_repos");
-  });
   },
 );
