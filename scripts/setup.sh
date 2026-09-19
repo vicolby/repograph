@@ -72,7 +72,7 @@ SMOKE="$(NEO4J_URI="${NEO4J_URI:-bolt://localhost:7687}" \
   NEO4J_USER="${NEO4J_USER:-neo4j}" \
   NEO4J_PASSWORD="$NEO4J_PASSWORD" \
   NEO4J_DATABASE="${NEO4J_DATABASE:-neo4j}" \
-  timeout 25 node -e "
+  node -e "
 const { spawn } = require('node:child_process');
 const child = spawn('node', ['dist/src/index.js'], { stdio: ['pipe', 'pipe', 'inherit'] });
 let buf = '';
