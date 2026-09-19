@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loadNeo4jConfigFromEnv } from "../src/config.js";
+import { loadNeo4jConfigFromEnv } from "../src/bootstrap.js";
 
 describe("loadNeo4jConfigFromEnv", () => {
   it("applies defaults when only the password is provided", () => {

@@ -2,7 +2,7 @@ import type { StartedNeo4jContainer } from "@testcontainers/neo4j";
 import type { Driver } from "neo4j-driver";
 import { afterAll, beforeAll, beforeEach, describe } from "vitest";
 import { withSession } from "../../src/repos/db.js";
-import { closeNeo4jDriver, createNeo4jDriver } from "../../src/neo4j/driver.js";
+import { closeNeo4jDriver, createNeo4jDriver } from "../../src/bootstrap.js";
 import { createRepoStore, type RepoStore } from "../../src/repos/store.js";
 import { startTestNeo4j } from "./neo4j-test-container.js";
 

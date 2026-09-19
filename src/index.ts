@@ -1,5 +1,5 @@
-import { loadNeo4jConfigFromEnv } from "./config.js";
-import { closeNeo4jDriver, createNeo4jDriver, verifyNeo4jConnectivity } from "./neo4j/driver.js";
+import { loadNeo4jConfigFromEnv } from "./bootstrap.js";
+import { closeNeo4jDriver, createNeo4jDriver, verifyNeo4jConnectivity } from "./bootstrap.js";
 import { createRepographServer, startStdioServer } from "./mcp/server.js";
 
 async function main(): Promise<void> {

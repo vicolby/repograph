@@ -1,7 +1,7 @@
 import type { StartedNeo4jContainer } from "@testcontainers/neo4j";
 import type { Driver } from "neo4j-driver";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { closeNeo4jDriver, createNeo4jDriver, verifyNeo4jConnectivity } from "../src/neo4j/driver.js";
+import { closeNeo4jDriver, createNeo4jDriver, verifyNeo4jConnectivity } from "../src/bootstrap.js";
 import { startTestNeo4j } from "./setup/neo4j-test-container.js";
 
 describe("neo4j connection module (real instance)", () => {
