@@ -28,6 +28,17 @@ This is a personal, local-only tool. It is not published or pushed anywhere.
 
 ## Setup
 
+One command (checks prerequisites, installs deps, creates `.env` on first
+run, starts Neo4j, builds, and smoke-tests the MCP spawn):
+
+```bash
+./scripts/setup.sh
+# or: npm run setup
+```
+
+Safe to re-run — it never overwrites an existing `.env`. Manual steps, if
+you prefer them:
+
 ```bash
 npm install
 cp .env.example .env   # then edit NEO4J_PASSWORD if you want something other than the default
