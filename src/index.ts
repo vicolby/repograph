@@ -1,10 +1,13 @@
 import { loadNeo4jConfigFromEnv } from "./config.js";
-import { closeNeo4jDriver, createNeo4jDriver } from "./neo4j/driver.js";
+import { closeNeo4jDriver, createNeo4jDriver, verifyNeo4jConnectivity } from "./neo4j/driver.js";
 import { createRepographServer, startStdioServer } from "./mcp/server.js";
 
 async function main(): Promise<void> {
   const config = loadNeo4jConfigFromEnv();
   const driver = createNeo4jDriver(config);
+
+  // Fail fast on a bad connection rather than waiting for the first tool call.
+  await verifyNeo4jConnectivity(driver, config.database);
 
   const server = createRepographServer({ driver, database: config.database });
 
