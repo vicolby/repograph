@@ -1,50 +1,33 @@
-import type { Driver } from "neo4j-driver";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { expect, it } from "vitest";
 import { createRepographServer } from "../src/mcp/server.js";
-import type { RepoStore } from "../src/repos/store.js";
 import {
-  clearDb,
   countEdges,
-  seedRepos,
-  startGraph,
-  stopGraph,
+  defineGraphSuite,
   TEST_DATABASE,
-  type TestGraph,
 } from "./setup/graph-fixture.js";
 
-describe("supersede_relation (real Neo4j)", () => {
-  let graph: TestGraph;
-  let driver: Driver;
-  let store: RepoStore;
-
-  beforeAll(async () => {
-    graph = await startGraph();
-    driver = graph.driver;
-    store = graph.store;
-  });
-
-  afterAll(async () => {
-    await stopGraph(graph);
-  });
-
-  beforeEach(async () => {
-    await clearDb(driver, TEST_DATABASE);
-    await seedRepos(store, [
+defineGraphSuite(
+  "supersede_relation (real Neo4j)",
+  {
+    seedRepos: [
       { repo: "group/service-a", type: "service" },
       { repo: "group/service-b", type: "service" },
       { repo: "group/service-c", type: "service" },
-    ]);
-    await store.addRelation({
-      from: "group/service-a",
-      to: "group/service-b",
-      type: "depends_on",
-      evidence: ["a calls b"],
-      created_by: "test-agent",
-    });
-  });
+    ],
+    seedRelations: [
+      {
+        from: "group/service-a",
+        to: "group/service-b",
+        type: "depends_on",
+        evidence: ["a calls b"],
+        created_by: "test-agent",
+      },
+    ],
+  },
+  ({ driver, store }) => {
 
   it("marks the edge superseded, preserving evidence, and hides it from default traversal", async () => {
-    const edge = await store.supersedeRelation({
+    const edge = await store().supersedeRelation({
       from: "group/service-a",
       to: "group/service-b",
       type: "depends_on",
@@ -61,12 +44,12 @@ describe("supersede_relation (real Neo4j)", () => {
     expect(Number.isNaN(Date.parse(edge.superseded_at as string))).toBe(false);
     expect(edge.superseded_by).toBe("infra.md rewired a -> c");
     // Soft delete: the edge row still exists.
-    await expect(countEdges(driver, TEST_DATABASE)).resolves.toBe(1);
+    await expect(countEdges(driver(), TEST_DATABASE)).resolves.toBe(1);
 
     // Default traversal skips superseded edges...
-    await expect(store.getRelatedRepos({ repo: "group/service-a" })).resolves.toEqual([]);
+    await expect(store().getRelatedRepos({ repo: "group/service-a" })).resolves.toEqual([]);
     // ...unless history is explicitly requested.
-    const withHistory = await store.getRelatedRepos({
+    const withHistory = await store().getRelatedRepos({
       repo: "group/service-a",
       include_superseded: true,
     });
@@ -74,14 +57,14 @@ describe("supersede_relation (real Neo4j)", () => {
   });
 
   it("superseding is idempotent and refreshes superseded_at", async () => {
-    const first = await store.supersedeRelation({
+    const first = await store().supersedeRelation({
       from: "group/service-a",
       to: "group/service-b",
       type: "depends_on",
     });
     expect(first.superseded_by).toBeNull();
     await new Promise((resolve) => setTimeout(resolve, 10));
-    const second = await store.supersedeRelation({
+    const second = await store().supersedeRelation({
       from: "group/service-a",
       to: "group/service-b",
       type: "depends_on",
@@ -92,19 +75,19 @@ describe("supersede_relation (real Neo4j)", () => {
       true,
     );
     expect(second.superseded_by).toBe("second pass");
-    await expect(countEdges(driver, TEST_DATABASE)).resolves.toBe(1);
+    await expect(countEdges(driver(), TEST_DATABASE)).resolves.toBe(1);
   });
 
   it("re-adding the triple via add_relation revives the edge", async () => {
-    await store.supersedeRelation({
+    await store().supersedeRelation({
       from: "group/service-a",
       to: "group/service-b",
       type: "depends_on",
       superseded_by: "stale",
     });
-    await expect(store.getRelatedRepos({ repo: "group/service-a" })).resolves.toEqual([]);
+    await expect(store().getRelatedRepos({ repo: "group/service-a" })).resolves.toEqual([]);
 
-    const revived = await store.addRelation({
+    const revived = await store().addRelation({
       from: "group/service-a",
       to: "group/service-b",
       type: "depends_on",
@@ -115,27 +98,27 @@ describe("supersede_relation (real Neo4j)", () => {
     expect(revived.superseded_by).toBeNull();
     expect(revived.evidence).toEqual(["a calls b", "a calls b again"]);
     await expect(
-      store.getRelatedRepos({ repo: "group/service-a" }).then((n) => n.map((r) => r.path)),
+      store().getRelatedRepos({ repo: "group/service-a" }).then((n) => n.map((r) => r.path)),
     ).resolves.toEqual(["group/service-b"]);
   });
 
   it("excludes multi-hop paths that traverse a superseded edge by default", async () => {
-    await store.addRelation({
+    await store().addRelation({
       from: "group/service-b",
       to: "group/service-c",
       type: "depends_on",
       evidence: ["b calls c"],
     });
-    await store.supersedeRelation({
+    await store().supersedeRelation({
       from: "group/service-a",
       to: "group/service-b",
       type: "depends_on",
     });
 
-    const hidden = await store.getRelatedRepos({ repo: "group/service-a", depth: 2 });
+    const hidden = await store().getRelatedRepos({ repo: "group/service-a", depth: 2 });
     expect(hidden.map((n) => n.path)).not.toContain("group/service-c");
 
-    const shown = await store.getRelatedRepos({
+    const shown = await store().getRelatedRepos({
       repo: "group/service-a",
       depth: 2,
       include_superseded: true,
@@ -145,7 +128,7 @@ describe("supersede_relation (real Neo4j)", () => {
 
   it("throws when the relation (or an endpoint repo) does not exist", async () => {
     await expect(
-      store.supersedeRelation({
+      store().supersedeRelation({
         from: "group/service-a",
         to: "group/service-b",
         type: "uses_infra",
@@ -153,14 +136,14 @@ describe("supersede_relation (real Neo4j)", () => {
       }),
     ).rejects.toThrow(/relation not found/i);
     await expect(
-      store.supersedeRelation({
+      store().supersedeRelation({
         from: "group/ghost",
         to: "group/service-b",
         type: "depends_on",
       }),
     ).rejects.toThrow(/not found/i);
     await expect(
-      store.supersedeRelation({
+      store().supersedeRelation({
         from: "group/service-a",
         to: "group/ghost",
         type: "depends_on",
@@ -170,13 +153,13 @@ describe("supersede_relation (real Neo4j)", () => {
 
   it("rejects blank from/to/type and blank superseded_by", async () => {
     await expect(
-      store.supersedeRelation({ from: "   ", to: "group/service-b", type: "depends_on" }),
+      store().supersedeRelation({ from: "   ", to: "group/service-b", type: "depends_on" }),
     ).rejects.toThrow(/from/i);
     await expect(
-      store.supersedeRelation({ from: "group/service-a", to: "group/service-b", type: "   " }),
+      store().supersedeRelation({ from: "group/service-a", to: "group/service-b", type: "   " }),
     ).rejects.toThrow(/type/i);
     await expect(
-      store.supersedeRelation({
+      store().supersedeRelation({
         from: "group/service-a",
         to: "group/service-b",
         type: "depends_on",
@@ -186,8 +169,9 @@ describe("supersede_relation (real Neo4j)", () => {
   });
 
   it("is registered as an MCP tool on the server", async () => {
-    const server = createRepographServer({ driver, database: TEST_DATABASE });
+    const server = createRepographServer({ driver: driver(), database: TEST_DATABASE });
     const tools = (server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools;
     expect(Object.keys(tools)).toContain("supersede_relation");
   });
-});
+  },
+);
