@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>repograph — граф связей репозиториев</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --purple: #bc8cff;
+    --orange: #d29922;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+  }
+  #deck { flex: 1; position: relative; overflow: hidden; }
+  .slide {
+    position: absolute; inset: 0; padding: 64px 72px;
+    display: none; flex-direction: column; justify-content: center;
+    max-width: 1100px; margin: 0 auto;
+  }
+  .slide.active { display: flex; }
+  .kicker { color: var(--accent); text-transform: uppercase; letter-spacing: 2px; font-size: 14px; margin-bottom: 12px; }
+  h1 { font-size: 52px; margin: 0 0 16px; line-height: 1.1; }
+  h2 { font-size: 36px; margin: 0 0 20px; }
+  p, li { font-size: 21px; line-height: 1.55; }
+  li { margin-bottom: 10px; }
+  .muted { color: var(--muted); }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px;
+  }
+  .card h3 { margin: 0 0 8px; font-size: 22px; }
+  .card h3 .tool { color: var(--green); font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+  .card p { font-size: 17px; margin: 0 0 10px; }
+  .card code { font-size: 15px; }
+  code, pre {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    background: #0a0d12; border: 1px solid var(--border); border-radius: 8px;
+  }
+  code { padding: 2px 7px; font-size: 0.85em; }
+  pre { padding: 18px 20px; font-size: 16px; line-height: 1.6; overflow-x: auto; }
+  .hl-tool { color: var(--green); }
+  .hl-str { color: var(--orange); }
+  .hl-num { color: var(--purple); }
+  .diagram {
+    display: flex; align-items: center; justify-content: center; gap: 14px;
+    margin: 26px 0; flex-wrap: wrap; font-size: 19px;
+  }
+  .node {
+    background: var(--panel); border: 1px solid var(--accent); border-radius: 10px;
+    padding: 12px 20px; font-family: ui-monospace, Consolas, monospace; font-size: 17px;
+  }
+  .node.db { border-color: var(--purple); }
+  .arrow { color: var(--muted); font-size: 26px; }
+  #bar {
+    display: flex; align-items: center; gap: 16px;
+    padding: 14px 28px; border-top: 1px solid var(--border);
+    font-size: 15px; color: var(--muted);
+  }
+  #bar button {
+    background: var(--panel); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 18px; font-size: 15px; cursor: pointer;
+  }
+  #bar button:hover { border-color: var(--accent); }
+  #progress { flex: 1; height: 6px; background: var(--panel); border-radius: 3px; overflow: hidden; }
+  #progress > div { height: 100%; background: var(--accent); width: 0; }
+  .step li { opacity: 0.25; transition: opacity .25s; }
+  .step li.shown { opacity: 1; }
+  @media (max-width: 800px) {
+    .slide { padding: 32px 24px; }
+    h1 { font-size: 34px; } h2 { font-size: 26px; }
+    p, li { font-size: 17px; } .cols { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="deck">
+
+  <section class="slide">
+    <div class="kicker">Локальный MCP-сервер + Neo4j</div>
+    <h1>repograph</h1>
+    <p class="muted" style="font-size:24px">Граф связей между репозиториями: какие сервисы что вызывают,<br>какие terraform-модули используют.</p>
+    <p>Агент, работая в одном репозитории, за секунды понимает, с чем тот связан.</p>
+    <p class="muted">← → или клики для навигации · 10 слайдов</p>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Проблема</div>
+    <h2>Знания о связях живут в головах</h2>
+    <ul>
+      <li>Какой сервис дергает этот API? Кто еще пользуется этим terraform-модулем?</li>
+      <li>Ответы — в памяти команды, в чатах, в устаревших wiki.</li>
+      <li>Новый человек (или агент) в репозитории этого контекста не имеет.</li>
+    </ul>
+    <p><strong>repograph</strong> фиксирует связи как данные: репозиторий → связь → репозиторий, с доказательствами (evidence).</p>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Архитектура</div>
+    <h2>Как это устроено</h2>
+    <div class="diagram">
+      <span class="node">OpenCode / Claude Code</span>
+      <span class="arrow">⇄ stdio</span>
+      <span class="node">repograph MCP<br><small class="muted">Node 20+, TS strict</small></span>
+      <span class="arrow">⇄ Bolt</span>
+      <span class="node db">Neo4j 5<br><small class="muted">docker-compose</small></span>
+    </div>
+    <ul>
+      <li>Один процесс на stdio — агент спавнит его как дочерний, секретов и сети нет.</li>
+      <li>Neo4j Community из <code>docker-compose.yml</code>: Bolt <code>localhost:7687</code>, UI <code>localhost:7474</code>.</li>
+      <li>Данные персистятся в Docker volume <code>neo4j-data</code> — переживают рестарты.</li>
+    </ul>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Возможности · 4 инструмента</div>
+    <h2>Весь API — четыре тулзы</h2>
+    <div class="cols">
+      <div class="card"><h3><span class="tool">add_repo</span></h3><p>Создать/обновить узел репозитория (upsert по нормализованному пути).</p><code>repo, type?, description?</code></div>
+      <div class="card"><h3><span class="tool">add_relation</span></h3><p>Связать два репозитория. Повтор того же триплета дописывает evidence.</p><code>from, to, type, evidence[], created_by?</code></div>
+      <div class="card"><h3><span class="tool">get_related_repos</span></h3><p>Соседи узла в обе стороны. Глубина 1–10, фильтр по типу связи.</p><code>repo, depth?, type?</code></div>
+      <div class="card"><h3><span class="tool">search_repos</span></h3><p>Нечеткий поиск по подстроке (путь + описание, без учета регистра).</p><code>query, limit? (default 20, max 100)</code></div>
+    </div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Умная нормализация</div>
+    <h2>Принимает то, что под рукой</h2>
+    <ul>
+      <li>SSH: <code>git@gitlab.com:shop/billing-api.git</code></li>
+      <li>HTTPS: <code>https://gitlab.com/shop/billing-api</code></li>
+      <li>Готовый путь: <code>shop/billing-api</code></li>
+    </ul>
+    <p>Всё приводится к одному ключу <code>shop/billing-api</code> (суффикс <code>.git</code> отрезается без учета регистра), дубли невозможны.</p>
+  </section>
+
+  <section class="slide step">
+    <div class="kicker">Пример · шаг 1–2</div>
+    <h2>Регистрируем репозитории и связь</h2>
+    <ul>
+      <li><span class="hl-tool">add_repo</span> — добавляем сервис биллинга</li>
+      <li><span class="hl-tool">add_repo</span> — добавляем terraform-модуль сети</li>
+      <li><span class="hl-tool">add_relation</span> — фиксируем: сервис использует модуль, с доказательством</li>
+    </ul>
+<pre><span class="hl-tool">add_repo</span>({ <span class="hl-str">repo</span>: <span class="hl-str">"git@gitlab.com:shop/billing-api.git"</span>, <span class="hl-str">type</span>: <span class="hl-str">"service"</span> })
+<span class="hl-tool">add_repo</span>({ <span class="hl-str">repo</span>: <span class="hl-str">"shop/platform/network"</span>, <span class="hl-str">type</span>: <span class="hl-str">"terraform-module"</span> })
+<span class="hl-tool">add_relation</span>({
+  <span class="hl-str">from</span>: <span class="hl-str">"shop/billing-api"</span>, <span class="hl-str">to</span>: <span class="hl-str">"shop/platform/network"</span>,
+  <span class="hl-str">type</span>: <span class="hl-str">"uses_infra"</span>, <span class="hl-str">evidence</span>: [<span class="hl-str">"billing-api/main.tf:12: module \"network\""</span>]
+})</pre>
+  </section>
+
+  <section class="slide step">
+    <div class="kicker">Пример · шаг 3–4</div>
+    <h2>Спрашиваем граф</h2>
+    <ul>
+      <li>Месяц спустя агент в репозитории биллинга: «от чего я завишу?»</li>
+      <li>Точного идентификатора модуля никто не помнит — ищет по подстроке</li>
+    </ul>
+<pre><span class="hl-tool">get_related_repos</span>({ <span class="hl-str">repo</span>: <span class="hl-str">"shop/billing-api"</span> })
+→ [{ <span class="hl-str">path</span>: <span class="hl-str">"shop/platform/network"</span>, <span class="hl-str">type</span>: <span class="hl-str">"terraform-module"</span> }]
+
+<span class="hl-tool">search_repos</span>({ <span class="hl-str">query</span>: <span class="hl-str">"bill"</span> })
+→ [{ <span class="hl-str">path</span>: <span class="hl-str">"shop/billing-api"</span>, <span class="hl-str">type</span>: <span class="hl-str">"service"</span> }]</pre>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Подключение</div>
+    <h2>Оба агента — один сервер</h2>
+    <div class="cols">
+      <div class="card"><h3>OpenCode</h3><p><code>opencode.json</code> в корне проекта, сервер <code>repograph</code> типа <code>local</code>. Проверка: <code>opencode mcp list</code> → connected.</p></div>
+      <div class="card"><h3>Claude Code</h3><p><code>.mcp.json</code> в корне (project scope). Один аппрув при первом запуске, дальше <code>/mcp</code> → connected.</p></div>
+    </div>
+    <p style="margin-top:20px">Оба спавнят <code>node dist/src/index.js</code> против одного и того же Neo4j. Других тулов (Codex, Gemini…) нет — осознанно вне скоупа.</p>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Старт за минуту</div>
+    <h2>Одна команда для нового человека</h2>
+<pre>git clone &lt;repo&gt; &amp;&amp; cd repograph &amp;&amp; ./scripts/setup.sh</pre>
+    <ul>
+      <li>Проверяет Node ≥ 20 и Docker, ставит зависимости (<code>npm ci</code>).</li>
+      <li>Создает <code>.env</code> при первом запуске, поднимает Neo4j, ждет healthy.</li>
+      <li>Собирает <code>dist/</code> и смоук-тестит stdio-спавн — все 4 тулзы.</li>
+    </ul>
+    <p class="muted">Повторный запуск безопасен: существующий <code>.env</code> не перезаписывается.</p>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Качество</div>
+    <h2>Проверено по-настоящему</h2>
+    <ul>
+      <li><strong>36 тестов, все зеленые</strong> — против реального Neo4j в disposable-контейнерах (testcontainers), без моков драйвера.</li>
+      <li>Строгий TypeScript, валидация входов через zod с понятными ошибками.</li>
+      <li>Живые проверки: оба клиента показывают <code>connected</code>, все 4 инструмента вызваны end-to-end против локального Neo4j.</li>
+    </ul>
+    <p style="margin-top:24px; font-size:26px">Вопросы? <span class="muted">Код, конфиги и setup — в корне репозитория.</span></p>
+  </section>
+
+</div>
+<div id="bar">
+  <button id="prev">← Назад</button>
+  <button id="next">Вперед →</button>
+  <div id="progress"><div></div></div>
+  <span id="counter">1 / 10</span>
+</div>
+<script>
+(function () {
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var idx = 0;
+  var bar = document.querySelector('#progress > div');
+  var counter = document.getElementById('counter');
+  function render() {
+    slides.forEach(function (s, i) { s.classList.toggle('active', i === idx); });
+    bar.style.width = ((idx + 1) / slides.length * 100) + '%';
+    counter.textContent = (idx + 1) + ' / ' + slides.length;
+    var stepItems = slides[idx].querySelectorAll('.step li, .slide.step li');
+    stepItems.forEach(function (li) { li.classList.add('shown'); });
+  }
+  function go(d) { idx = Math.max(0, Math.min(slides.length - 1, idx + d)); render(); }
+  document.getElementById('prev').onclick = function () { go(-1); };
+  document.getElementById('next').onclick = function () { go(1); };
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === ' ') go(1);
+    if (e.key === 'ArrowLeft') go(-1);
+    if (e.key === 'Home') { idx = 0; render(); }
+    if (e.key === 'End') { idx = slides.length - 1; render(); }
+  });
+  var startX = null;
+  document.getElementById('deck').addEventListener('touchstart', function (e) {
+    startX = e.changedTouches[0].clientX;
+  });
+  document.getElementById('deck').addEventListener('touchend', function (e) {
+    if (startX === null) return;
+    var dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1);
+    startX = null;
+  });
+  render();
+})();
+</script>
+</body>
+</html>
