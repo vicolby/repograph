@@ -4,6 +4,7 @@ import type { Driver } from "neo4j-driver";
 import { z } from "zod";
 import { addRepo } from "../repos/addRepo.js";
 import { addRelation } from "../repos/addRelation.js";
+import { searchRepos } from "../repos/searchRepos.js";
 
 export type RepographServerDeps = {
   driver: Driver;
@@ -11,8 +12,8 @@ export type RepographServerDeps = {
 };
 
 /**
- * Builds the repograph MCP server. `get_related_repos` and `search_repos`
- * are registered here by later work.
+ * Builds the repograph MCP server. `get_related_repos` is registered here
+ * by later work.
  */
 export function createRepographServer(deps: RepographServerDeps): McpServer {
   const server = new McpServer({ name: "repograph", version: "0.1.0" });
@@ -93,6 +94,33 @@ export function createRepographServer(deps: RepographServerDeps): McpServer {
         created_by,
       });
       return { content: [{ type: "text" as const, text: JSON.stringify(edge) }] };
+    },
+  );
+
+  server.registerTool(
+    "search_repos",
+    {
+      description:
+        "Find repository nodes by partial (substring, case-insensitive) match on path or description. " +
+        "Use when the exact repository identifier is unknown.",
+      inputSchema: {
+        query: z
+          .string()
+          .min(1)
+          .describe("Substring to search for in repository path and description"),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe("Max nodes to return (default 20, max 100)"),
+      },
+    },
+    async (args: { query: string; limit?: number | undefined }) => {
+      const { query, limit } = args;
+      const nodes = await searchRepos(deps.driver, deps.database, { query, limit });
+      return { content: [{ type: "text" as const, text: JSON.stringify(nodes) }] };
     },
   );
 

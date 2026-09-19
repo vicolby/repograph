@@ -51,3 +51,21 @@ export function requiredTextList(value: unknown, tool: string, field: string): s
 export function resolveRepoPath(raw: unknown, tool: string, field: string): string {
   return normalizeRepoIdentifier(requiredText(raw, tool, field)).path;
 }
+
+/** Validates an optional integer field; returns `defaultValue` when omitted. */
+export function optionalIntInRange(
+  value: number | undefined,
+  tool: string,
+  field: string,
+  min: number,
+  max: number,
+  defaultValue: number,
+): number {
+  if (value === undefined) return defaultValue;
+  if (typeof value !== "number" || !Number.isInteger(value) || value < min || value > max) {
+    throw new Error(
+      `${tool} field ${JSON.stringify(field)} must be an integer between ${min} and ${max} when provided`,
+    );
+  }
+  return value;
+}
