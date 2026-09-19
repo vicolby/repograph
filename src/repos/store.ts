@@ -1,6 +1,7 @@
 import type { Driver } from "neo4j-driver";
 import { addRelation, type AddRelationInput, type RelationEdge } from "./addRelation.js";
 import { addRepo, type AddRepoInput, type RepoNode } from "./addRepo.js";
+import { getRelatedRepos, type GetRelatedReposInput } from "./getRelatedRepos.js";
 import { searchRepos, type SearchReposInput } from "./searchRepos.js";
 
 // Public seam of the src/repos/ module: outside callers (the MCP server,
@@ -9,12 +10,20 @@ import { searchRepos, type SearchReposInput } from "./searchRepos.js";
 // identifier normalization (normalize.ts), per-tool Cypher — is internal.
 
 // Domain types, re-exported so callers never reach past this seam.
-export type { AddRelationInput, AddRepoInput, RelationEdge, RepoNode, SearchReposInput };
+export type {
+  AddRelationInput,
+  AddRepoInput,
+  GetRelatedReposInput,
+  RelationEdge,
+  RepoNode,
+  SearchReposInput,
+};
 
 /** Bound handle to the repo graph: driver and database fixed once, not per call. */
 export type RepoStore = {
   addRepo(input: AddRepoInput): Promise<RepoNode>;
   addRelation(input: AddRelationInput): Promise<RelationEdge>;
+  getRelatedRepos(input: GetRelatedReposInput): Promise<RepoNode[]>;
   searchRepos(input: SearchReposInput): Promise<RepoNode[]>;
 };
 
@@ -23,6 +32,7 @@ export function createRepoStore(driver: Driver, database: string): RepoStore {
   return {
     addRepo: (input) => addRepo(driver, database, input),
     addRelation: (input) => addRelation(driver, database, input),
+    getRelatedRepos: (input) => getRelatedRepos(driver, database, input),
     searchRepos: (input) => searchRepos(driver, database, input),
   };
 }

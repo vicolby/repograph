@@ -10,8 +10,8 @@ export type RepographServerDeps = {
 };
 
 /**
- * Builds the repograph MCP server. `get_related_repos` is registered here
- * by later work.
+ * Builds the repograph MCP server with the repo-graph tool registry
+ * (`add_repo`, `add_relation`, `get_related_repos`, `search_repos`).
  */
 export function createRepographServer(deps: RepographServerDeps): McpServer {
   const server = new McpServer({ name: "repograph", version: "0.1.0" });
@@ -93,6 +93,41 @@ export function createRepographServer(deps: RepographServerDeps): McpServer {
         created_by,
       });
       return { content: [{ type: "text" as const, text: JSON.stringify(edge) }] };
+    },
+  );
+
+  server.registerTool(
+    "get_related_repos",
+    {
+      description:
+        "List repositories connected to the given one, traversing RELATES edges in both directions " +
+        "(outgoing and incoming). Defaults to direct (depth-1) neighbors; depth widens the traversal " +
+        "and type restricts it to edges of that free-text relation type. repo accepts a git remote " +
+        "URL (SSH or HTTPS) or an already-normalized path (group/subgroup/project).",
+      inputSchema: {
+        repo: z
+          .string()
+          .min(1)
+          .describe(
+            "Repository identifier: git remote URL (SSH or HTTPS) or GitLab full path (group/subgroup/project)",
+          ),
+        depth: z
+          .number()
+          .int()
+          .min(1)
+          .max(10)
+          .optional()
+          .describe("Traversal depth in hops (default 1, max 10)"),
+        type: z
+          .string()
+          .optional()
+          .describe("Only traverse edges whose relation type equals this value"),
+      },
+    },
+    async (args: { repo: string; depth?: number | undefined; type?: string | undefined }) => {
+      const { repo, depth, type } = args;
+      const nodes = await store.getRelatedRepos({ repo, depth, type });
+      return { content: [{ type: "text" as const, text: JSON.stringify(nodes) }] };
     },
   );
 
