@@ -1,7 +1,7 @@
 import type { Driver } from "neo4j-driver";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createRepographServer } from "../src/mcp/server.js";
-import { addRelation } from "../src/repos/addRelation.js";
+import type { RepoStore } from "../src/repos/store.js";
 import {
   clearDb,
   countEdges,
@@ -15,10 +15,12 @@ import {
 describe("add_relation (real Neo4j)", () => {
   let graph: TestGraph;
   let driver: Driver;
+  let store: RepoStore;
 
   beforeAll(async () => {
     graph = await startGraph();
     driver = graph.driver;
+    store = graph.store;
   });
 
   afterAll(async () => {
@@ -27,14 +29,14 @@ describe("add_relation (real Neo4j)", () => {
 
   beforeEach(async () => {
     await clearDb(driver, TEST_DATABASE);
-    await seedRepos(driver, TEST_DATABASE, [
+    await seedRepos(store, [
       { repo: "group/service-a", type: "service" },
       { repo: "group/service-b", type: "service" },
     ]);
   });
 
   it("creates an edge with type, evidence, created_by, created_at", async () => {
-    const edge = await addRelation(driver, TEST_DATABASE, {
+    const edge = await store.addRelation({
       from: "group/service-a",
       to: "group/service-b",
       type: "depends_on",
@@ -53,7 +55,7 @@ describe("add_relation (real Neo4j)", () => {
   });
 
   it("accepts arbitrary type strings, not a fixed enum", async () => {
-    const edge = await addRelation(driver, TEST_DATABASE, {
+    const edge = await store.addRelation({
       from: "group/service-a",
       to: "group/service-b",
       type: "quantum-entangled-with",
@@ -64,14 +66,14 @@ describe("add_relation (real Neo4j)", () => {
   });
 
   it("repeating the same (from, to, type) appends evidence and refreshes created_at without duplicating", async () => {
-    const first = await addRelation(driver, TEST_DATABASE, {
+    const first = await store.addRelation({
       from: "group/service-a",
       to: "group/service-b",
       type: "depends_on",
       evidence: ["first: handler.ts:12"],
     });
     await new Promise((resolve) => setTimeout(resolve, 10));
-    const second = await addRelation(driver, TEST_DATABASE, {
+    const second = await store.addRelation({
       from: "group/service-a",
       to: "group/service-b",
       type: "depends_on",
@@ -84,7 +86,7 @@ describe("add_relation (real Neo4j)", () => {
   });
 
   it("accepts SSH URL, HTTPS URL, and plain path for from/to", async () => {
-    const edge = await addRelation(driver, TEST_DATABASE, {
+    const edge = await store.addRelation({
       from: "git@gitlab.com:group/service-a.git",
       to: "https://gitlab.com/group/service-b.git",
       type: "depends_on",
@@ -97,13 +99,13 @@ describe("add_relation (real Neo4j)", () => {
   });
 
   it("keeps separate edges for different types on the same pair", async () => {
-    await addRelation(driver, TEST_DATABASE, {
+    await store.addRelation({
       from: "group/service-a",
       to: "group/service-b",
       type: "depends_on",
       evidence: ["calls API"],
     });
-    await addRelation(driver, TEST_DATABASE, {
+    await store.addRelation({
       from: "group/service-a",
       to: "group/service-b",
       type: "uses_infra",
@@ -115,7 +117,7 @@ describe("add_relation (real Neo4j)", () => {
 
   it("throws when either endpoint repo does not exist", async () => {
     await expect(
-      addRelation(driver, TEST_DATABASE, {
+      store.addRelation({
         from: "group/ghost",
         to: "group/service-b",
         type: "depends_on",
@@ -123,7 +125,7 @@ describe("add_relation (real Neo4j)", () => {
       }),
     ).rejects.toThrow(/not found/i);
     await expect(
-      addRelation(driver, TEST_DATABASE, {
+      store.addRelation({
         from: "group/service-a",
         to: "group/ghost",
         type: "depends_on",
@@ -135,7 +137,7 @@ describe("add_relation (real Neo4j)", () => {
 
   it("requires non-empty evidence", async () => {
     await expect(
-      addRelation(driver, TEST_DATABASE, {
+      store.addRelation({
         from: "group/service-a",
         to: "group/service-b",
         type: "depends_on",

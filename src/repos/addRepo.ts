@@ -1,5 +1,6 @@
 import type { Driver } from "neo4j-driver";
 import { ensureRepoConstraints, mapRepoNode, withSession } from "./db.js";
+// Internal to the src/repos/ module (see store.ts): do not import from outside src/repos/.
 import { optionalText } from "./input.js";
 import { normalizeRepoIdentifier } from "./normalize.js";
 

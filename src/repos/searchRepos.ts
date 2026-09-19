@@ -3,6 +3,7 @@ import neo4j from "neo4j-driver";
 import type { RepoNode } from "./addRepo.js";
 import { mapRepoNode, withSession } from "./db.js";
 import { optionalIntInRange, requiredText } from "./input.js";
+// Internal to the src/repos/ module (see store.ts): do not import from outside src/repos/.
 
 export type SearchReposInput = {
   /** Substring to match against repo `path` and `description` (case-insensitive). */

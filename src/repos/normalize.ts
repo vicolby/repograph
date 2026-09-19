@@ -1,3 +1,4 @@
+// Internal to the src/repos/ module (see store.ts): do not import from outside src/repos/.
 export type NormalizedRepo = {
   /** Normalized GitLab full path, e.g. `group/subgroup/project`. Unique key of the Repo node. */
   path: string;

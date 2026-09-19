@@ -1,5 +1,6 @@
 import type { Driver, Record as Neo4jRecord } from "neo4j-driver";
 import { ensureRepoConstraints, withSession } from "./db.js";
+// Internal to the src/repos/ module (see store.ts): do not import from outside src/repos/.
 import { optionalText, requiredText, requiredTextList, resolveRepoPath } from "./input.js";
 
 export type AddRelationInput = {

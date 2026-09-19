@@ -1,7 +1,7 @@
 import type { Driver } from "neo4j-driver";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createRepographServer } from "../src/mcp/server.js";
-import { addRepo } from "../src/repos/addRepo.js";
+import type { RepoStore } from "../src/repos/store.js";
 import { normalizeRepoIdentifier } from "../src/repos/normalize.js";
 import {
   clearDb,
@@ -33,10 +33,12 @@ describe("normalizeRepoIdentifier", () => {
 describe("add_repo (real Neo4j)", () => {
   let graph: TestGraph;
   let driver: Driver;
+  let store: RepoStore;
 
   beforeAll(async () => {
     graph = await startGraph();
     driver = graph.driver;
+    store = graph.store;
   });
 
   afterAll(async () => {
@@ -48,7 +50,7 @@ describe("add_repo (real Neo4j)", () => {
   });
 
   it("creates a Repo node with path, url, type, description", async () => {
-    const node = await addRepo(driver, TEST_DATABASE, {
+    const node = await store.addRepo({
       repo: "https://gitlab.com/group/project.git",
       type: "service",
       description: "Billing API",
@@ -62,12 +64,12 @@ describe("add_repo (real Neo4j)", () => {
   });
 
   it("upserts: second call for the same repo updates fields instead of duplicating", async () => {
-    await addRepo(driver, TEST_DATABASE, {
+    await store.addRepo({
       repo: "group/project",
       type: "service",
       description: "v1",
     });
-    const updated = await addRepo(driver, TEST_DATABASE, {
+    const updated = await store.addRepo({
       repo: "https://gitlab.com/group/project",
       description: "v2",
     });
@@ -80,16 +82,16 @@ describe("add_repo (real Neo4j)", () => {
   });
 
   it("resolves SSH URL, HTTPS URL, and plain path to the same node", async () => {
-    await addRepo(driver, TEST_DATABASE, { repo: "git@gitlab.com:group/sub/project.git", type: "service" });
-    await addRepo(driver, TEST_DATABASE, { repo: "https://gitlab.com/group/sub/project.git" });
-    const node = await addRepo(driver, TEST_DATABASE, { repo: "group/sub/project" });
+    await store.addRepo({ repo: "git@gitlab.com:group/sub/project.git", type: "service" });
+    await store.addRepo({ repo: "https://gitlab.com/group/sub/project.git" });
+    const node = await store.addRepo({ repo: "group/sub/project" });
 
     expect(node.path).toBe("group/sub/project");
     await expect(countRepos(driver, TEST_DATABASE)).resolves.toBe(1);
   });
 
   it("accepts arbitrary type strings without code changes", async () => {
-    const node = await addRepo(driver, TEST_DATABASE, {
+    const node = await store.addRepo({
       repo: "group/novel-thing",
       type: "quantum-widget-frobnicator",
     });

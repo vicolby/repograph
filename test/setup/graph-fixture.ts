@@ -1,7 +1,7 @@
 import type { StartedNeo4jContainer } from "@testcontainers/neo4j";
 import type { Driver } from "neo4j-driver";
 import { closeNeo4jDriver, createNeo4jDriver } from "../../src/neo4j/driver.js";
-import { addRepo } from "../../src/repos/addRepo.js";
+import { createRepoStore, type RepoStore } from "../../src/repos/store.js";
 import { startTestNeo4j } from "./neo4j-test-container.js";
 
 // Shared fixture for the real-Neo4j suites: container lifecycle, database
@@ -15,6 +15,7 @@ export type TestGraph = {
   container: StartedNeo4jContainer;
   driver: Driver;
   database: string;
+  store: RepoStore;
 };
 
 /** Starts a disposable Neo4j container and a driver for it. Stop with `stopGraph`. */
@@ -26,7 +27,8 @@ export async function startGraph(): Promise<TestGraph> {
     password: container.getPassword(),
     database: TEST_DATABASE,
   });
-  return { container, driver, database: TEST_DATABASE };
+  const store = createRepoStore(driver, TEST_DATABASE);
+  return { container, driver, database: TEST_DATABASE, store };
 }
 
 /** Closes the driver and stops the container. */
@@ -51,14 +53,10 @@ export type SeedRepo = {
   description?: string | undefined;
 };
 
-/** Creates Repo nodes via the `addRepo` tool (same seam the suites exercise). */
-export async function seedRepos(
-  driver: Driver,
-  database: string,
-  specs: SeedRepo[],
-): Promise<void> {
+/** Creates Repo nodes via the store (same seam the suites exercise). */
+export async function seedRepos(store: RepoStore, specs: SeedRepo[]): Promise<void> {
   for (const spec of specs) {
-    await addRepo(driver, database, spec);
+    await store.addRepo(spec);
   }
 }
 

@@ -2,9 +2,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import type { Driver } from "neo4j-driver";
 import { z } from "zod";
-import { addRepo } from "../repos/addRepo.js";
-import { addRelation } from "../repos/addRelation.js";
-import { searchRepos } from "../repos/searchRepos.js";
+import { createRepoStore } from "../repos/store.js";
 
 export type RepographServerDeps = {
   driver: Driver;
@@ -17,6 +15,7 @@ export type RepographServerDeps = {
  */
 export function createRepographServer(deps: RepographServerDeps): McpServer {
   const server = new McpServer({ name: "repograph", version: "0.1.0" });
+  const store = createRepoStore(deps.driver, deps.database);
 
   server.registerTool(
     "add_repo",
@@ -41,7 +40,7 @@ export function createRepographServer(deps: RepographServerDeps): McpServer {
     },
     async (args: { repo: string; type?: string | undefined; description?: string | undefined }) => {
       const { repo, type, description } = args;
-      const node = await addRepo(deps.driver, deps.database, { repo, type, description });
+      const node = await store.addRepo({ repo, type, description });
       return { content: [{ type: "text" as const, text: JSON.stringify(node) }] };
     },
   );
@@ -86,7 +85,7 @@ export function createRepographServer(deps: RepographServerDeps): McpServer {
       created_by?: string | undefined;
     }) => {
       const { from, to, type, evidence, created_by } = args;
-      const edge = await addRelation(deps.driver, deps.database, {
+      const edge = await store.addRelation({
         from,
         to,
         type,
@@ -119,7 +118,7 @@ export function createRepographServer(deps: RepographServerDeps): McpServer {
     },
     async (args: { query: string; limit?: number | undefined }) => {
       const { query, limit } = args;
-      const nodes = await searchRepos(deps.driver, deps.database, { query, limit });
+      const nodes = await store.searchRepos({ query, limit });
       return { content: [{ type: "text" as const, text: JSON.stringify(nodes) }] };
     },
   );
