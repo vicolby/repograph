@@ -11,7 +11,7 @@ export type GetRelatedReposInput = {
    * GitLab full path (`group/subgroup/project`).
    */
   repo: string;
-  /** Traversal depth. Defaults to 1, clamped to 1..10. */
+  /** Traversal depth. Defaults to 1, must be an integer in 1..10. */
   depth?: number | undefined;
   /** When provided, only traverses edges whose free-text `type` equals this value. */
   type?: string | null | undefined;

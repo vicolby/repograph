@@ -45,15 +45,15 @@ const toolDefs = [
     inputSchema: z.object({
       repo: z
         .string()
-        .min(1)
         .describe(
           "Repository identifier: git remote URL (SSH or HTTPS) or GitLab full path (group/subgroup/project)",
         ),
       type: z
         .string()
+        .nullable()
         .optional()
         .describe("Free-text repository type, e.g. service or terraform-module"),
-      description: z.string().optional().describe("Optional repository description"),
+      description: z.string().nullable().optional().describe("Optional repository description"),
     }),
     invoke: (store, args) =>
       store.addRepo({ repo: args.repo, type: args.type, description: args.description }),
@@ -68,22 +68,19 @@ const toolDefs = [
     inputSchema: z.object({
       from: z
         .string()
-        .min(1)
         .describe(
           "Source repository: git remote URL (SSH or HTTPS) or GitLab full path (group/subgroup/project)",
         ),
       to: z
         .string()
-        .min(1)
         .describe(
           "Target repository: git remote URL (SSH or HTTPS) or GitLab full path (group/subgroup/project)",
         ),
-      type: z.string().min(1).describe("Free-text relation type, e.g. depends_on or uses_infra"),
+      type: z.string().describe("Free-text relation type, e.g. depends_on or uses_infra"),
       evidence: z
-        .array(z.string().min(1))
-        .min(1)
+        .array(z.string())
         .describe("Sources/citations the relation was derived from (file/line references, quotes)"),
-      created_by: z.string().optional().describe("Who/what recorded the relation"),
+      created_by: z.string().nullable().optional().describe("Who/what recorded the relation"),
     }),
     invoke: (store, args) =>
       store.addRelation({
@@ -105,19 +102,18 @@ const toolDefs = [
     inputSchema: z.object({
       from: z
         .string()
-        .min(1)
         .describe(
           "Source repository: git remote URL (SSH or HTTPS) or GitLab full path (group/subgroup/project)",
         ),
       to: z
         .string()
-        .min(1)
         .describe(
           "Target repository: git remote URL (SSH or HTTPS) or GitLab full path (group/subgroup/project)",
         ),
-      type: z.string().min(1).describe("Free-text relation type, must match the edge exactly"),
+      type: z.string().describe("Free-text relation type, must match the edge exactly"),
       superseded_by: z
         .string()
+        .nullable()
         .optional()
         .describe("Who/what superseded the relation, e.g. a citation like 'infra.md rewired a -> c'"),
     }),
@@ -139,19 +135,16 @@ const toolDefs = [
     inputSchema: z.object({
       repo: z
         .string()
-        .min(1)
         .describe(
           "Repository identifier: git remote URL (SSH or HTTPS) or GitLab full path (group/subgroup/project)",
         ),
       depth: z
         .number()
-        .int()
-        .min(1)
-        .max(10)
         .optional()
         .describe("Traversal depth in hops (default 1, max 10)"),
       type: z
         .string()
+        .nullable()
         .optional()
         .describe("Only traverse edges whose relation type equals this value"),
       include_superseded: z
@@ -175,12 +168,9 @@ const toolDefs = [
       "Find repository nodes by partial (substring, case-insensitive) match on path or description. " +
       "Use when the exact repository identifier is unknown.",
     inputSchema: z.object({
-      query: z.string().min(1).describe("Substring to search for in repository path and description"),
+      query: z.string().describe("Substring to search for in repository path and description"),
       limit: z
         .number()
-        .int()
-        .min(1)
-        .max(100)
         .optional()
         .describe("Max nodes to return (default 20, max 100)"),
     }),

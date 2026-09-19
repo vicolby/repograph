@@ -3,9 +3,10 @@ import { normalizeRepoIdentifier } from "./normalize.js";
 // Internal to the src/repos/ module (see store.ts): do not import from outside src/repos/.
 
 // Shared input-preparation seam for repo-graph tools: raw MCP args go in,
-// validated domain values come out. Tool modules keep their intent (which
-// fields, which aliases); every trim/reject/throw rule lives here so the
-// MCP error surface stays consistent as tools are added.
+// validated domain values come out. All trim/reject/throw rules live here;
+// the MCP zod schemas in `src/mcp/server.ts` are thin transport types only
+// (field names and scalar shapes, no min/max/int/range constraints), so both
+// MCP calls and direct store calls fail the same way through this seam.
 //
 // `tool` is the calling tool's name (e.g. "add_relation"). It prefixes every
 // error message, so an agent seeing the error knows which call failed.

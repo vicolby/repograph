@@ -1,22 +1,17 @@
 import type { Driver } from "neo4j-driver";
 import { ensureRepoConstraints, mapRepoNode, withSession } from "./db.js";
 // Internal to the src/repos/ module (see store.ts): do not import from outside src/repos/.
-import { optionalText } from "./input.js";
+import { optionalText, requiredText } from "./input.js";
 import { normalizeRepoIdentifier } from "./normalize.js";
 
 export type AddRepoInput = {
   /**
    * Repository identifier: a git remote URL (SSH `git@host:group/project.git`
    * or HTTPS `https://host/group/project.git`) or an already-normalized
-   * GitLab full path (`group/subgroup/project`). Aliases `path`, `url`,
-   * `pathOrUrl`, and `identifier` are accepted for ergonomics; `repo` wins
-   * when several are provided.
+   * GitLab full path (`group/subgroup/project`). Validated and normalized
+   * through the shared `input.ts` seam, same as every other tool.
    */
-  repo?: string | undefined;
-  path?: string | undefined;
-  url?: string | undefined;
-  pathOrUrl?: string | undefined;
-  identifier?: string | undefined;
+  repo: string;
   /** Free-text repository type (e.g. `service`, `terraform-module`). Any string is accepted. */
   type?: string | null | undefined;
   description?: string | null | undefined;
@@ -29,17 +24,6 @@ export type RepoNode = {
   description: string | null;
 };
 
-/** Picks the identifier from the accepted aliases; throws when none is provided. */
-export function resolveRepoIdentifier(input: AddRepoInput): string {
-  const candidates = [input.repo, input.pathOrUrl, input.identifier, input.path, input.url];
-  for (const candidate of candidates) {
-    if (typeof candidate === "string" && candidate.trim().length > 0) {
-      return candidate;
-    }
-  }
-  throw new Error("add_repo requires one of: repo, path, url");
-}
-
 /**
  * Creates a Repo node or updates the existing one (upsert keyed on the
  * normalized `path`).
@@ -49,7 +33,7 @@ export function resolveRepoIdentifier(input: AddRepoInput): string {
  *   when non-null; url only when the identifier was a URL), never duplicates.
  */
 export async function addRepo(driver: Driver, database: string, input: AddRepoInput): Promise<RepoNode> {
-  const rawIdentifier = resolveRepoIdentifier(input);
+  const rawIdentifier = requiredText(input.repo, "add_repo", "repo");
   const { path, canonicalUrl, wasUrl } = normalizeRepoIdentifier(rawIdentifier);
   const type = optionalText(input.type, "add_repo", "type");
   const description = optionalText(input.description, "add_repo", "description");

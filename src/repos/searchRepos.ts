@@ -8,7 +8,7 @@ import { optionalIntInRange, requiredText } from "./input.js";
 export type SearchReposInput = {
   /** Substring to match against repo `path` and `description` (case-insensitive). */
   query: string;
-  /** Max nodes to return. Defaults to 20, clamped to 1..100. */
+  /** Max nodes to return. Defaults to 20, must be an integer in 1..100. */
   limit?: number | undefined;
 };
 
