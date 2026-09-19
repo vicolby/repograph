@@ -11,9 +11,13 @@ This is a personal, local-only tool. It is not published or pushed anywhere.
 - `docker-compose.yml` — Neo4j Community Edition, reachable over Bolt.
 - `src/config.ts` — reads Neo4j connection settings from environment variables.
 - `src/neo4j/driver.ts` — shared Neo4j driver module used by the server (and later, its tools).
-- `src/mcp/server.ts` / `src/index.ts` — an MCP server that speaks stdio, with an
-  empty tool registry. `add_repo`, `add_relation`, `get_related_repos`, and
-  `search_repos` are added by later tickets.
+- `src/mcp/server.ts` / `src/index.ts` — an MCP server that speaks stdio, with
+  four tools: `add_repo`, `add_relation`, `get_related_repos`, and
+  `search_repos`.
+- `opencode.json` — project-local OpenCode config that spawns the server
+  over stdio (`repograph`).
+- `.mcp.json` — project-scoped Claude Code config that spawns the same
+  stdio server (`repograph`).
 - `test/` — a smoke test that exercises the driver module against a real,
   disposable Neo4j instance (via testcontainers), plus a unit test for config parsing.
 
@@ -51,6 +55,33 @@ npm run dev
 This starts the server as a stdio process — the same way an agent (OpenCode,
 Claude Code) spawns it as a child process. It reads Neo4j connection settings
 from the environment (see `.env.example`).
+
+For the agent-spawned entrypoint, build first so `dist/` is fresh, then run
+the compiled server (this is exactly what `opencode.json` and `.mcp.json`
+spawn):
+
+```bash
+npm run build
+npm start
+```
+
+## Connecting agents (OpenCode + Claude Code)
+
+Both agents spawn the same local stdio server against the Neo4j instance
+from `docker-compose.yml`. No other agent tools are configured.
+
+- **OpenCode** reads `opencode.json` in the project root automatically.
+  Verify with `opencode mcp list` — `repograph` should show as connected.
+- **Claude Code** reads `.mcp.json` in the project root (project scope).
+  Approve it once when prompted, then check `/mcp` or
+  `claude mcp get repograph`.
+
+Both configs run `node dist/src/index.js` with the default local Neo4j
+credentials from `.env.example` (`bolt://localhost:7687`,
+`neo4j` / `changeme-local-only`, database `neo4j`). Rebuild after pulling
+(`npm run build`) so the spawned server matches `src/`. To use a different
+password, change `NEO4J_PASSWORD` in both files to match
+`docker-compose.yml`'s auth.
 
 ## Testing
 

@@ -8,12 +8,12 @@
     "node": ">=20"
   },
   "bin": {
-    "repograph-mcp": "./dist/index.js"
+    "repograph-mcp": "./dist/src/index.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx src/index.ts",
-    "start": "node dist/index.js",
+    "start": "node dist/src/index.js",
     "typecheck": "tsc --noEmit",
     "test": "TESTCONTAINERS_RYUK_DISABLED=true vitest run",
     "test:watch": "TESTCONTAINERS_RYUK_DISABLED=true vitest"
