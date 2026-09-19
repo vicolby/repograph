@@ -1,0 +1,34 @@
+{
+  "name": "repograph",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP server backed by Neo4j that tracks relationships between repositories.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "repograph-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "TESTCONTAINERS_RYUK_DISABLED=true vitest run",
+    "test:watch": "TESTCONTAINERS_RYUK_DISABLED=true vitest"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0",
+    "neo4j-driver": "^6.2.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@testcontainers/neo4j": "^12.1.0",
+    "@types/node": "^22.20.4",
+    "testcontainers": "^12.1.0",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1"
+  }
+}

@@ -1,0 +1,20 @@
+services:
+  neo4j:
+    image: neo4j:5-community
+    container_name: repograph-neo4j
+    ports:
+      - "7474:7474" # HTTP (browser UI)
+      - "7687:7687" # Bolt
+    environment:
+      # No APOC/GDS plugins on this scaffold - NEO4J_PLUGINS intentionally unset.
+      NEO4J_AUTH: "neo4j/${NEO4J_PASSWORD:-changeme-local-only}"
+    volumes:
+      - neo4j-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:7474 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  neo4j-data:
