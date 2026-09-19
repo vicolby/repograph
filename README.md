@@ -4,7 +4,8 @@ MCP server backed by Neo4j that tracks relationships between repositories
 (which services call which, which terraform modules they use, etc.), so an
 AI agent working in one repo can quickly understand what it's connected to.
 
-This is a personal, local-only tool. It is not published or pushed anywhere.
+This is a personal, local-only tool: the MCP server and Neo4j run on your
+own machine. The code lives at https://github.com/vicolby/repograph.
 
 ## What's here (project scaffold)
 
