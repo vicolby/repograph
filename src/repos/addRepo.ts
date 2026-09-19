@@ -1,4 +1,5 @@
 import type { Driver } from "neo4j-driver";
+import { ensureRepoConstraints, mapRepoNode, withSession } from "./db.js";
 import { normalizeRepoIdentifier } from "./normalize.js";
 
 export type AddRepoInput = {
@@ -59,11 +60,9 @@ export async function addRepo(driver: Driver, database: string, input: AddRepoIn
   const type = optionalText(input.type, "type");
   const description = optionalText(input.description, "description");
 
-  const session = driver.session({ database });
-  try {
-    await session.run(
-      "CREATE CONSTRAINT repo_path_unique IF NOT EXISTS FOR (r:Repo) REQUIRE r.path IS UNIQUE",
-    );
+  const params = { path, url: canonicalUrl, type, description, wasUrl };
+  return withSession(driver, database, async (session) => {
+    await ensureRepoConstraints(session);
     const result = await session.run(
       `MERGE (r:Repo {path: $path})
        ON CREATE SET r.url = $url, r.type = $type, r.description = $description
@@ -72,19 +71,12 @@ export async function addRepo(driver: Driver, database: string, input: AddRepoIn
          r.type = CASE WHEN $type IS NOT NULL THEN $type ELSE r.type END,
          r.description = CASE WHEN $description IS NOT NULL THEN $description ELSE r.description END
        RETURN r.path AS path, r.url AS url, r.type AS type, r.description AS description`,
-      { path, url: canonicalUrl, type, description, wasUrl },
+      params,
     );
     const record = result.records[0];
     if (!record) {
       throw new Error("add_repo failed: no record returned");
     }
-    return {
-      path: record.get("path") as string,
-      url: record.get("url") as string,
-      type: (record.get("type") as string | null) ?? null,
-      description: (record.get("description") as string | null) ?? null,
-    };
-  } finally {
-    await session.close();
-  }
+    return mapRepoNode(record);
+  });
 }
