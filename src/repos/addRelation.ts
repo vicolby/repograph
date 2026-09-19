@@ -1,6 +1,6 @@
 import type { Driver, Record as Neo4jRecord } from "neo4j-driver";
-import { normalizeRepoIdentifier } from "./normalize.js";
 import { ensureRepoConstraints, withSession } from "./db.js";
+import { optionalText, requiredText, requiredTextList, resolveRepoPath } from "./input.js";
 
 export type AddRelationInput = {
   /** Source repo: git remote URL (SSH/HTTPS) or normalized path. */
@@ -23,33 +23,6 @@ export type RelationEdge = {
   created_by: string | null;
   created_at: string;
 };
-
-function requiredText(value: unknown, field: string): string {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    throw new Error(`add_relation field ${JSON.stringify(field)} must be a non-empty string`);
-  }
-  return value.trim();
-}
-
-function optionalText(value: string | null | undefined, field: string): string | null {
-  if (value === undefined || value === null) return null;
-  if (typeof value !== "string" || value.trim().length === 0) {
-    throw new Error(`add_relation field ${JSON.stringify(field)} must be a non-empty string when provided`);
-  }
-  return value.trim();
-}
-
-function requiredEvidence(value: unknown): string[] {
-  if (!Array.isArray(value) || value.length === 0) {
-    throw new Error("add_relation field \"evidence\" must be a non-empty array of strings");
-  }
-  return value.map((entry, index) => {
-    if (typeof entry !== "string" || entry.trim().length === 0) {
-      throw new Error(`add_relation field \"evidence\" entry at index ${index} must be a non-empty string`);
-    }
-    return entry.trim();
-  });
-}
 
 function mapRelationEdge(record: Neo4jRecord): RelationEdge {
   return {
@@ -80,11 +53,11 @@ export async function addRelation(
   database: string,
   input: AddRelationInput,
 ): Promise<RelationEdge> {
-  const { path: fromPath } = normalizeRepoIdentifier(requiredText(input.from, "from"));
-  const { path: toPath } = normalizeRepoIdentifier(requiredText(input.to, "to"));
-  const type = requiredText(input.type, "type");
-  const evidence = requiredEvidence(input.evidence);
-  const createdBy = optionalText(input.created_by, "created_by");
+  const fromPath = resolveRepoPath(input.from, "add_relation", "from");
+  const toPath = resolveRepoPath(input.to, "add_relation", "to");
+  const type = requiredText(input.type, "add_relation", "type");
+  const evidence = requiredTextList(input.evidence, "add_relation", "evidence");
+  const createdBy = optionalText(input.created_by, "add_relation", "created_by");
   const now = new Date().toISOString();
 
   return withSession(driver, database, async (session) => {

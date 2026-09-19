@@ -1,5 +1,6 @@
 import type { Driver } from "neo4j-driver";
 import { ensureRepoConstraints, mapRepoNode, withSession } from "./db.js";
+import { optionalText } from "./input.js";
 import { normalizeRepoIdentifier } from "./normalize.js";
 
 export type AddRepoInput = {
@@ -38,14 +39,6 @@ export function resolveRepoIdentifier(input: AddRepoInput): string {
   throw new Error("add_repo requires one of: repo, path, url");
 }
 
-function optionalText(value: string | null | undefined, field: string): string | null {
-  if (value === undefined || value === null) return null;
-  if (typeof value !== "string") {
-    throw new Error(`add_repo field ${JSON.stringify(field)} must be a string`);
-  }
-  return value;
-}
-
 /**
  * Creates a Repo node or updates the existing one (upsert keyed on the
  * normalized `path`).
@@ -57,8 +50,8 @@ function optionalText(value: string | null | undefined, field: string): string |
 export async function addRepo(driver: Driver, database: string, input: AddRepoInput): Promise<RepoNode> {
   const rawIdentifier = resolveRepoIdentifier(input);
   const { path, canonicalUrl, wasUrl } = normalizeRepoIdentifier(rawIdentifier);
-  const type = optionalText(input.type, "type");
-  const description = optionalText(input.description, "description");
+  const type = optionalText(input.type, "add_repo", "type");
+  const description = optionalText(input.description, "add_repo", "description");
 
   const params = { path, url: canonicalUrl, type, description, wasUrl };
   return withSession(driver, database, async (session) => {
