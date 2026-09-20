@@ -86,3 +86,58 @@ export function optionalBoolean(
   }
   return value;
 }
+
+/**
+ * Validates an optional per-side file-scope hint list (`from_paths`/`to_paths`).
+ *
+ * Returns `undefined` when omitted (caller preserves the stored side);
+ * otherwise returns the trimmed list (explicit `[]` clears that side).
+ * Entries are repo-root-relative POSIX paths with optional `*`/`**`/`?`
+ * globs; leading `/` and any `..` segment are rejected. At most 50 entries
+ * per call, at most 500 chars per entry. Exact-string duplicates within one
+ * call are dropped, preserving first-seen order.
+ */
+export function optionalPathHintList(
+  value: string[] | undefined,
+  tool: string,
+  field: string,
+): string[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) {
+    throw new Error(`${tool} field ${JSON.stringify(field)} must be an array of strings when provided`);
+  }
+  if (value.length > 50) {
+    throw new Error(`${tool} field ${JSON.stringify(field)} must be an array of at most 50 entries`);
+  }
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (let index = 0; index < value.length; index++) {
+    const entry = value[index];
+    if (typeof entry !== "string" || entry.trim().length === 0) {
+      throw new Error(
+        `${tool} field ${JSON.stringify(field)} entry at index ${index} must be a non-empty string`,
+      );
+    }
+    const trimmed = entry.trim();
+    if (trimmed.length > 500) {
+      throw new Error(
+        `${tool} field ${JSON.stringify(field)} entry at index ${index} must be at most 500 characters`,
+      );
+    }
+    if (trimmed.startsWith("/")) {
+      throw new Error(
+        `${tool} field ${JSON.stringify(field)} entry at index ${index} must be a repo-root-relative path (no leading "/")`,
+      );
+    }
+    if (trimmed.split("/").includes("..")) {
+      throw new Error(
+        `${tool} field ${JSON.stringify(field)} entry at index ${index} must be a repo-root-relative path without ".." segments`,
+      );
+    }
+    if (!seen.has(trimmed)) {
+      seen.add(trimmed);
+      out.push(trimmed);
+    }
+  }
+  return out;
+}

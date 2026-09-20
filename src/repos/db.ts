@@ -69,6 +69,9 @@ export function mapRelationEdge(record: Neo4jRecord): RelationEdge {
     created_at: record.get("created_at") as string,
     superseded_at: (record.get("superseded_at") as string | null) ?? null,
     superseded_by: (record.get("superseded_by") as string | null) ?? null,
+    // Edges stored before path hints existed carry no such property (null).
+    from_paths: (record.get("from_paths") as string[] | null) ?? [],
+    to_paths: (record.get("to_paths") as string[] | null) ?? [],
   };
 }
 

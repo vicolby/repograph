@@ -105,7 +105,9 @@ export function registerAll(server: McpServer, store: RepoStore): void {
       description:
         "Record that one repository is connected to another. Creates a directed edge between two " +
         "existing repos, or appends evidence to the existing edge when the same (from, to, type) " +
-        "triple is recorded again. from/to accept a git remote URL (SSH or HTTPS) or an " +
+        "triple is recorded again. Optional from_paths/to_paths carry per-side file-scope hints " +
+        "(repo-root-relative paths, globs allowed): omitted preserves, [] clears, otherwise " +
+        "appended with dedup. from/to accept a git remote URL (SSH or HTTPS) or an " +
         "already-normalized path (group/subgroup/project).",
       inputSchema: z.object({
         from: z
@@ -123,6 +125,19 @@ export function registerAll(server: McpServer, store: RepoStore): void {
           .array(z.string())
           .describe("Sources/citations the relation was derived from (file/line references, quotes)"),
         created_by: z.string().nullable().optional().describe("Who/what recorded the relation"),
+        from_paths: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Optional file-scope hints for the from repo (repo-root-relative paths, * / ** / ? globs allowed). " +
+              "Omitted preserves the stored side; explicit [] clears it; otherwise appended with dedup.",
+          ),
+        to_paths: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Optional file-scope hints for the to repo. Same write semantics as from_paths.",
+          ),
       }),
     },
     (args) =>
@@ -133,6 +148,8 @@ export function registerAll(server: McpServer, store: RepoStore): void {
           type: args.type,
           evidence: args.evidence,
           created_by: args.created_by,
+          from_paths: args.from_paths,
+          to_paths: args.to_paths,
         }),
       ),
   );

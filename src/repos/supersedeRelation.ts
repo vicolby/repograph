@@ -52,7 +52,8 @@ export async function supersedeRelation(
          r.superseded_by = CASE WHEN $supersededBy IS NOT NULL THEN $supersededBy ELSE r.superseded_by END
        RETURN a.path AS from, b.path AS to, r.type AS type,
          r.evidence AS evidence, r.created_by AS created_by, r.created_at AS created_at,
-         r.superseded_at AS superseded_at, r.superseded_by AS superseded_by`,
+         r.superseded_at AS superseded_at, r.superseded_by AS superseded_by,
+         r.from_paths AS from_paths, r.to_paths AS to_paths`,
       { fromPath, toPath, type, supersededBy, now },
     );
     const record = result.records[0];
