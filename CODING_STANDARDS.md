@@ -210,8 +210,9 @@ startup/stdout/SIGTERM regressions.
 ## 10. Type-system discipline
 
 Adapted from the `typescript-best-practices` skill
-(<https://github.com/cursor/plugins/tree/main/pstack/skills/typescript-best-practices>;
-see its `references/patterns.md` for code examples). These rules apply
+(<https://github.com/cursor/plugins/tree/main/pstack/skills/typescript-best-practices>).
+Code examples live in `docs/typescript-patterns.md` (adapted from the
+skill's `references/patterns.md` with repo-specific cases). These rules apply
 when reading or editing any `.ts` file. Where a rule meets an existing
 repo convention, the repo convention wins — notes below say how.
 
