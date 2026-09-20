@@ -206,3 +206,30 @@ startup/stdout/SIGTERM regressions.
   (`Add evidence_mode (append/replace) to add_relation` + body
   explaining the recovery path it enables); reference the issue
   (`Fixes #2`) so it closes on merge to `main`.
+
+## 10. Type-system discipline
+
+Adapted from the `typescript-best-practices` skill
+(<https://github.com/cursor/plugins/tree/main/pstack/skills/typescript-best-practices>;
+see its `references/patterns.md` for code examples). These rules apply
+when reading or editing any `.ts` file. Where a rule meets an existing
+repo convention, the repo convention wins — notes below say how.
+
+| Rule | What it means here |
+|------|--------------------|
+| Discriminated unions | Model variants with a `kind`/`type` literal discriminant so impossible states can't be represented. No boolean-plus-optionals bags. (`ToolSuccess`/`ToolFailure` stay separate types for the same reason.) |
+| Branded types | Brand primitives with `& { readonly __brand: "X" }` where same-typed values travel together and could be swapped (e.g. `from`/`to` paths). Validate once at the boundary (`input.ts`, `normalize.ts`); trust the type inside. Don't brand by reflex. |
+| Constructive modeling | Prefer shapes the illegal value can't inhabit (`[T, ...T[]]` for non-empty) over a loose type plus a repeated runtime check. |
+| Simplest total type | Keep `T[]` while every operation on it stays total. Strengthen (e.g. to non-empty) only where the loose type forces `!`, a cast, or a "should never happen" throw. |
+| `unknown` over `any` | External data is `unknown`: RPC args (the SDK gives them to handlers; `runTool`/`mapToolError` already treat throws as `unknown`), `JSON.parse`, env, driver results. Narrow before use. |
+| Schemas before hand-rolled guards | The repo's runtime schema library is zod — but the domain "schema" for tool inputs is deliberately `input.ts` (§3), because error-message wording is a contract. Do not add a zod schema that duplicates `input.ts` validation; the two would drift. Use zod for what it owns: env config (`bootstrap.ts`) and thin transport shapes (`server.ts`). |
+| No `as` casts | Every `as` is a runtime crash waiting. The only tolerated casts are earned ones at the validated boundary: the `record.get(…) as …` mappings in `db.ts` (the Neo4j driver returns `any`; the mapper is the parse), and `as const` literal narrowings. Any new `as` elsewhere must be justified in the commit message. |
+| Narrowing hierarchy | Discriminant switch > `in` operator > `typeof`/`instanceof` > user-defined guard > `as`. |
+| Type guards | Must verify the claim; a lying guard is worse than `as`. Name them `isX`/`hasX`. Prefer discriminant narrowing when possible. |
+| Exhaustiveness | Inline `const _exhaustive: never = x;` in default arms so the compiler errors when a new variant is added. |
+| `satisfies` over `as` | Validates without widening literals (already used for the `{ data }` envelope in `server.ts`). |
+| Boundary validation | Parse where data crosses in, into a named domain type — that is `input.ts` + `normalize.ts`. `Record<string, unknown>` stops at that parse; trust types inside and don't re-validate down the call chain. |
+| Schema-derived types | Reach for `Pick`/`Omit`/`Parameters`/`ReturnType`/`Awaited`/`typeof` before declaring a new interface (e.g. derive handler arg types from `RepoStore` instead of redeclaring them). |
+| Object args | Pass objects, not positionals — tool inputs already are (`AddRelationInput`, …). New functions with 2+ params take an object. Skip on hot paths (none currently). |
+| Real tests | Already §7: no mocked driver, real Neo4j, real stdio build. Mock only what can't run locally. |
+| Structured telemetry | No `console.log` in shipped code — stdout is reserved for the MCP protocol (e2e asserts zero non-JSON stdout). Diagnostics go to stderr (`src/index.ts` startup failure is the template). |
