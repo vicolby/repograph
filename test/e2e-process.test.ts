@@ -222,6 +222,26 @@ describe("e2e process/stdio (real Neo4j, spawned dist)", () => {
         data: [{ from: A, to: B, from_paths: ["src/a.ts"], to_paths: ["lib/b.ts"] }],
       });
 
+      const fix = await s.req("tools/call", {
+        name: "add_relation",
+        arguments: {
+          from: A,
+          to: B,
+          type: "depends_on",
+          evidence: ["e2e probe, typo fixed"],
+          evidence_mode: "replace",
+        },
+      });
+      expect(fix.isError ?? false).toBe(false);
+      expect(parseBody(fix)).toMatchObject({
+        data: {
+          type: "depends_on",
+          evidence: ["e2e probe, typo fixed"],
+          from_paths: ["src/a.ts"],
+          to_paths: ["lib/b.ts"],
+        },
+      });
+
       const search = await s.req("tools/call", { name: "search_repos", arguments: { query: "e2e" } });
       expect(search.isError ?? false).toBe(false);
       expect((parseBody(search) as { data: unknown[] }).data).toHaveLength(2);
