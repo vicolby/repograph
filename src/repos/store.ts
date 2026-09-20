@@ -2,6 +2,7 @@ import type { Driver } from "neo4j-driver";
 import { addRelation, type AddRelationInput, type RelationEdge } from "./addRelation.js";
 import { addRepo, type AddRepoInput, type RepoNode } from "./addRepo.js";
 import { getRelatedRepos, type GetRelatedReposInput } from "./getRelatedRepos.js";
+import { getRelations, type GetRelationsInput } from "./getRelations.js";
 import { searchRepos, type SearchReposInput } from "./searchRepos.js";
 import { supersedeRelation, type SupersedeRelationInput } from "./supersedeRelation.js";
 
@@ -15,6 +16,7 @@ export type {
   AddRelationInput,
   AddRepoInput,
   GetRelatedReposInput,
+  GetRelationsInput,
   RelationEdge,
   RepoNode,
   SearchReposInput,
@@ -27,6 +29,7 @@ export type RepoStore = {
   addRelation(input: AddRelationInput): Promise<RelationEdge>;
   supersedeRelation(input: SupersedeRelationInput): Promise<RelationEdge>;
   getRelatedRepos(input: GetRelatedReposInput): Promise<RepoNode[]>;
+  getRelations(input: GetRelationsInput): Promise<RelationEdge[]>;
   searchRepos(input: SearchReposInput): Promise<RepoNode[]>;
 };
 
@@ -37,6 +40,7 @@ export function createRepoStore(driver: Driver, database: string): RepoStore {
     addRelation: (input) => addRelation(driver, database, input),
     supersedeRelation: (input) => supersedeRelation(driver, database, input),
     getRelatedRepos: (input) => getRelatedRepos(driver, database, input),
+    getRelations: (input) => getRelations(driver, database, input),
     searchRepos: (input) => searchRepos(driver, database, input),
   };
 }

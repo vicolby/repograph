@@ -106,7 +106,7 @@ defineGraphSuite(
       return client;
     }
 
-    it("lists all five tools", async () => {
+    it("lists all six tools", async () => {
       const client = await newClient();
       try {
         await expect(client.listToolNames()).resolves.toEqual([
@@ -114,6 +114,7 @@ defineGraphSuite(
           "add_relation",
           "supersede_relation",
           "get_related_repos",
+          "get_relations",
           "search_repos",
         ]);
       } finally {
@@ -179,6 +180,48 @@ defineGraphSuite(
         );
         expect(edge.isError).toBe(true);
         expect(edge.body as ToolFailure).toMatchObject({ code: "NOT_FOUND" });
+
+        const relations = parseCall(
+          await client.callTool("get_relations", { repo: "group/no-such-repo" }),
+        );
+        expect(relations.isError).toBe(true);
+        expect(relations.body as ToolFailure).toMatchObject({ code: "NOT_FOUND" });
+      } finally {
+        await client.close();
+      }
+    });
+
+    it("serves get_relations with hints through the { data } envelope", async () => {
+      const client = await newClient();
+      try {
+        const written = parseCall(
+          await client.callTool("add_relation", {
+            from: "group/service-a",
+            to: "group/service-b",
+            type: "depends_on",
+            evidence: ["a calls b"],
+            from_paths: ["src/a.ts"],
+            to_paths: ["lib/b.ts"],
+          }),
+        );
+        expect(written.isError).toBe(false);
+
+        const { isError, body } = parseCall(
+          await client.callTool("get_relations", {
+            repo: "group/service-a",
+            direction: "out",
+          }),
+        );
+        expect(isError).toBe(false);
+        expect((body as ToolSuccess<Array<{ from_paths: string[] }>>).data).toMatchObject([
+          { from_paths: ["src/a.ts"], to_paths: ["lib/b.ts"] },
+        ]);
+
+        const invalid = parseCall(
+          await client.callTool("get_relations", { repo: "group/service-a", type: "   " }),
+        );
+        expect(invalid.isError).toBe(true);
+        expect(invalid.body as ToolFailure).toMatchObject({ code: "INVALID_INPUT" });
       } finally {
         await client.close();
       }

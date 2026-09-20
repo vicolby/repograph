@@ -87,6 +87,27 @@ export function optionalBoolean(
   return value;
 }
 
+/** Edge-read direction for `get_relations`: which side of `repo` to match. */
+export type RelationDirection = "out" | "in" | "both";
+
+/**
+ * Validates an optional edge-read direction; returns `"both"` when omitted.
+ * Anything outside `out`/`in`/`both` (including non-strings) throws.
+ */
+export function optionalRelationDirection(
+  value: unknown,
+  tool: string,
+  field: string,
+): RelationDirection {
+  if (value === undefined) return "both";
+  if (value !== "out" && value !== "in" && value !== "both") {
+    throw new Error(
+      `${tool} field ${JSON.stringify(field)} must be one of "out", "in", or "both" when provided`,
+    );
+  }
+  return value;
+}
+
 /**
  * Validates an optional per-side file-scope hint list (`from_paths`/`to_paths`).
  *
