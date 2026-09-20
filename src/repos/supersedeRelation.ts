@@ -28,6 +28,9 @@ export type SupersedeRelationInput = {
  *   throws — there is nothing to retract.
  * - Repeat calls refresh `superseded_at` and update `superseded_by` only
  *   when a new value is passed, never duplicating the edge.
+ * - File-scope hints (`from_paths`/`to_paths`) are never modified here:
+ *   supersede preserves them verbatim so an accidental retract does not
+ *   lose search scope.
  * - Re-recording the triple via `add_relation` revives the edge (clears the
  *   supersede markers) and appends the new evidence.
  */
