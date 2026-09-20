@@ -7,7 +7,7 @@ import {
   optionalText,
   requiredText,
   requiredTextList,
-  resolveRepoPath,
+  resolveRepoIdentifier,
 } from "./input.js";
 
 export type AddRelationInput = {
@@ -73,15 +73,18 @@ export type RelationEdge = {
  *   append-with-dedup (exact, case-sensitive, order-preserving). A previously
  *   superseded edge is revived (its `superseded_at`/`superseded_by` markers
  *   are cleared).
- * - Both endpoints must already exist (via `add_repo`); otherwise throws.
+ * - Both endpoints must already exist (via `add_repo`); otherwise throws
+ *   NOT_FOUND naming `search_repos` (and, for a bare short name, the
+ *   candidate full paths). A bare short name auto-resolves when exactly
+ *   one tracked repo ends with it.
  */
 export async function addRelation(
   driver: Driver,
   database: string,
   input: AddRelationInput,
 ): Promise<RelationEdge> {
-  const fromPath = resolveRepoPath(input.from, "add_relation", "from");
-  const toPath = resolveRepoPath(input.to, "add_relation", "to");
+  const fromRef = resolveRepoIdentifier(input.from, "add_relation", "from");
+  const toRef = resolveRepoIdentifier(input.to, "add_relation", "to");
   const type = requiredText(input.type, "add_relation", "type");
   const evidence = requiredTextList(input.evidence, "add_relation", "evidence");
   const evidenceMode = optionalEvidenceMode(input.evidence_mode, "add_relation", "evidence_mode");
@@ -92,7 +95,7 @@ export async function addRelation(
 
   return withSession(driver, database, async (session) => {
     await ensureRepoConstraints(session);
-    await ensureReposExist(session, fromPath, toPath, "add_relation");
+    const { fromPath, toPath } = await ensureReposExist(session, fromRef, toRef, "add_relation");
 
     const result = await session.run(
       `MATCH (a:Repo {path: $fromPath}), (b:Repo {path: $toPath})

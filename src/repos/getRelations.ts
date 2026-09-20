@@ -5,7 +5,7 @@ import {
   optionalBoolean,
   optionalRelationDirection,
   optionalText,
-  resolveRepoPath,
+  resolveRepoIdentifier,
   type RelationDirection,
 } from "./input.js";
 // Internal to the src/repos/ module (see store.ts): do not import from outside src/repos/.
@@ -45,7 +45,10 @@ export type GetRelationsInput = {
  * - Edges stored before path hints existed read back as `[]` on both
  *   sides (see `mapRelationEdge`).
  * - Results are ordered by `(from, to, type)`.
- * - Throws when the repo does not exist yet (call `add_repo` first).
+ * - Throws NOT_FOUND when the repo does not exist: the message names
+ *   `search_repos` and, for a bare short name, the candidate full paths.
+ *   A bare short name (no group) auto-resolves when exactly one tracked
+ *   repo ends with it.
  * - Unlike `get_related_repos` (repo nodes only), this returns edges.
  */
 export async function getRelations(
@@ -53,7 +56,7 @@ export async function getRelations(
   database: string,
   input: GetRelationsInput,
 ): Promise<RelationEdge[]> {
-  const repoPath = resolveRepoPath(input.repo, "get_relations", "repo");
+  const repoRef = resolveRepoIdentifier(input.repo, "get_relations", "repo");
   const direction = optionalRelationDirection(input.direction, "get_relations", "direction");
   const typeFilter = optionalText(input.type, "get_relations", "type");
   const includeSuperseded = optionalBoolean(
@@ -64,7 +67,7 @@ export async function getRelations(
   );
 
   return withSession(driver, database, async (session) => {
-    await ensureRepoExists(session, repoPath, "get_relations");
+    const repoPath = await ensureRepoExists(session, repoRef, "get_relations");
 
     // Anchor on the stored edge orientation: `a` is always the source, so
     // `from`/`to` stay edge-oriented for every direction.

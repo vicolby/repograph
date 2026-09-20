@@ -2,7 +2,7 @@ import type { Driver } from "neo4j-driver";
 import type { RelationEdge } from "./addRelation.js";
 import { ensureRepoConstraints, ensureReposExist, mapRelationEdge, withSession } from "./db.js";
 // Internal to the src/repos/ module (see store.ts): do not import from outside src/repos/.
-import { optionalText, requiredText, resolveRepoPath } from "./input.js";
+import { optionalText, requiredText, resolveRepoIdentifier } from "./input.js";
 
 export type SupersedeRelationInput = {
   /** Source repo: git remote URL (SSH/HTTPS) or normalized path. */
@@ -23,7 +23,8 @@ export type SupersedeRelationInput = {
  * it, so the evidence trail survives and `get_related_repos` can filter it
  * out by default (with an opt-in flag to see history).
  *
- * - Both endpoints must already exist (via `add_repo`); otherwise throws.
+ * - Both endpoints must already exist (via `add_repo`); otherwise throws
+ *   NOT_FOUND naming `search_repos` (short names auto-resolve when unambiguous).
  * - The `(from, to, type)` triple must match an existing edge; otherwise
  *   throws — there is nothing to retract.
  * - Repeat calls refresh `superseded_at` and update `superseded_by` only
@@ -39,15 +40,15 @@ export async function supersedeRelation(
   database: string,
   input: SupersedeRelationInput,
 ): Promise<RelationEdge> {
-  const fromPath = resolveRepoPath(input.from, "supersede_relation", "from");
-  const toPath = resolveRepoPath(input.to, "supersede_relation", "to");
+  const fromRef = resolveRepoIdentifier(input.from, "supersede_relation", "from");
+  const toRef = resolveRepoIdentifier(input.to, "supersede_relation", "to");
   const type = requiredText(input.type, "supersede_relation", "type");
   const supersededBy = optionalText(input.superseded_by, "supersede_relation", "superseded_by");
   const now = new Date().toISOString();
 
   return withSession(driver, database, async (session) => {
     await ensureRepoConstraints(session);
-    await ensureReposExist(session, fromPath, toPath, "supersede_relation");
+    const { fromPath, toPath } = await ensureReposExist(session, fromRef, toRef, "supersede_relation");
 
     const result = await session.run(
       `MATCH (a:Repo {path: $fromPath})-[r:RELATES {type: $type}]->(b:Repo {path: $toPath})

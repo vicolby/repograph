@@ -281,6 +281,34 @@ describe("e2e process/stdio (real Neo4j, spawned dist)", () => {
       expect(missing.isError).toBe(true);
       expect(parseBody(missing)).toMatchObject({ code: "NOT_FOUND" });
 
+      const shortMiss = await s.req("tools/call", {
+        name: "get_relations",
+        arguments: { repo: "no-such-short-xyz" },
+      });
+      expect(shortMiss.isError).toBe(true);
+      expect(parseBody(shortMiss)).toMatchObject({ code: "NOT_FOUND" });
+      expect(JSON.stringify(parseBody(shortMiss))).toContain("search_repos");
+
+      const shortResolve = await s.req("tools/call", {
+        name: "get_relations",
+        arguments: { repo: "e2e-a", include_superseded: true },
+      });
+      expect(shortResolve.isError ?? false).toBe(false);
+      expect(parseBody(shortResolve)).toMatchObject({ data: [{ from: A, to: B }] });
+
+      const shortTrav = await s.req("tools/call", {
+        name: "get_related_repos",
+        arguments: { repo: "e2e-a", include_superseded: true },
+      });
+      expect(shortTrav.isError ?? false).toBe(false);
+      expect((parseBody(shortTrav) as { data: Array<{ path: string }> }).data.map((n) => n.path)).toContain(
+        B,
+      );
+
+      const shortAdd = await s.req("tools/call", { name: "add_repo", arguments: { repo: "lonely-short" } });
+      expect(shortAdd.isError).toBe(true);
+      expect(parseBody(shortAdd)).toMatchObject({ code: "INVALID_INPUT" });
+
       expect(s.getNonJsonStdout()).toEqual([]);
 
       const exitP = waitExit(s.child, SIGTERM_GRACE_MS);

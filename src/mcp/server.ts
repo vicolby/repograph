@@ -78,7 +78,8 @@ export function registerAll(server: McpServer, store: RepoStore): void {
       description:
         "Create a repository node or update the existing one (upsert keyed on the normalized GitLab full path). " +
         "Accepts a git remote URL (SSH git@host:group/project.git or HTTPS https://host/group/project.git) " +
-        "or an already-normalized path (group/subgroup/project).",
+        "or an already-normalized path (group/subgroup/project, at least group and project — " +
+        "single-segment short names are rejected, use search_repos to find the full path).",
       inputSchema: z.object({
         repo: z
           .string()
@@ -109,7 +110,9 @@ export function registerAll(server: McpServer, store: RepoStore): void {
         "(fix a typo, drop a stale entry); default \"append\" accumulates. Optional from_paths/to_paths carry per-side file-scope hints " +
         "(repo-root-relative paths, globs allowed): omitted preserves, [] clears, otherwise " +
         "appended with dedup. from/to accept a git remote URL (SSH or HTTPS) or an " +
-        "already-normalized path (group/subgroup/project).",
+        "already-normalized path (group/subgroup/project). A bare short name without any group " +
+        "(project only) resolves automatically when exactly one tracked repo ends with it; " +
+        "otherwise the call fails naming search_repos and the candidate full paths.",
       inputSchema: z.object({
         from: z
           .string()
@@ -170,7 +173,9 @@ export function registerAll(server: McpServer, store: RepoStore): void {
         "(from, to, type) triple as superseded (sets superseded_at/superseded_by) instead of deleting " +
         "it, so the evidence trail survives. Superseded edges are hidden from get_related_repos by " +
         "default. Re-recording the same triple via add_relation revives the edge. from/to accept a " +
-        "git remote URL (SSH or HTTPS) or an already-normalized path (group/subgroup/project).",
+        "git remote URL (SSH or HTTPS) or an already-normalized path (group/subgroup/project); " +
+        "a bare short name resolves automatically when unambiguous, otherwise the call fails " +
+        "naming search_repos and the candidate full paths.",
       inputSchema: z.object({
         from: z
           .string()
@@ -208,7 +213,9 @@ export function registerAll(server: McpServer, store: RepoStore): void {
         "List repositories connected to the given one, traversing RELATES edges in both directions " +
         "(outgoing and incoming). Defaults to direct (depth-1) neighbors; depth widens the traversal " +
         "and type restricts it to edges of that free-text relation type. repo accepts a git remote " +
-        "URL (SSH or HTTPS) or an already-normalized path (group/subgroup/project).",
+        "URL (SSH or HTTPS) or an already-normalized path (group/subgroup/project); a bare short " +
+        "name (project only) resolves automatically when exactly one tracked repo ends with it, " +
+        "otherwise the call fails with NOT_FOUND naming search_repos and the candidate full paths.",
       inputSchema: z.object({
         repo: z
           .string()
@@ -251,7 +258,9 @@ export function registerAll(server: McpServer, store: RepoStore): void {
         "file-scope hints (from_paths/to_paths) for scoping the next search. Direction selects " +
         "outgoing (out), incoming (in), or all (both, default) incident edges; type restricts " +
         "to edges of that free-text relation type. repo accepts a git remote URL (SSH or HTTPS) " +
-        "or an already-normalized path (group/subgroup/project).",
+        "or an already-normalized path (group/subgroup/project); a bare short name (project only) " +
+        "resolves automatically when exactly one tracked repo ends with it, otherwise the call " +
+        "fails with NOT_FOUND naming search_repos and the candidate full paths.",
       inputSchema: z.object({
         repo: z
           .string()

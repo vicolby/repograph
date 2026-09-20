@@ -35,6 +35,13 @@ export type RepoNode = {
 export async function addRepo(driver: Driver, database: string, input: AddRepoInput): Promise<RepoNode> {
   const rawIdentifier = requiredText(input.repo, "add_repo", "repo");
   const { path, canonicalUrl, wasUrl } = normalizeRepoIdentifier(rawIdentifier);
+  if (!path.includes("/")) {
+    throw new Error(
+      `add_repo: invalid repository path ${JSON.stringify(path)}: GitLab full path must be ` +
+        `"group/project" (at least two segments); got single-segment ${JSON.stringify(path)}. ` +
+        `Use the full path or search_repos to find it.`,
+    );
+  }
   const type = optionalText(input.type, "add_repo", "type");
   const description = optionalText(input.description, "add_repo", "description");
 
