@@ -105,7 +105,8 @@ export function registerAll(server: McpServer, store: RepoStore): void {
       description:
         "Record that one repository is connected to another. Creates a directed edge between two " +
         "existing repos, or appends evidence to the existing edge when the same (from, to, type) " +
-        "triple is recorded again. Optional from_paths/to_paths carry per-side file-scope hints " +
+        "triple is recorded again. Pass evidence_mode \"replace\" to overwrite evidence wholesale " +
+        "(fix a typo, drop a stale entry); default \"append\" accumulates. Optional from_paths/to_paths carry per-side file-scope hints " +
         "(repo-root-relative paths, globs allowed): omitted preserves, [] clears, otherwise " +
         "appended with dedup. from/to accept a git remote URL (SSH or HTTPS) or an " +
         "already-normalized path (group/subgroup/project).",
@@ -125,6 +126,12 @@ export function registerAll(server: McpServer, store: RepoStore): void {
           .array(z.string())
           .describe("Sources/citations the relation was derived from (file/line references, quotes)"),
         created_by: z.string().nullable().optional().describe("Who/what recorded the relation"),
+        evidence_mode: z
+          .enum(["append", "replace"])
+          .optional()
+          .describe(
+            "How to apply evidence on an existing edge: append (default) accumulates, replace overwrites wholesale",
+          ),
         from_paths: z
           .array(z.string())
           .optional()
@@ -147,6 +154,7 @@ export function registerAll(server: McpServer, store: RepoStore): void {
           to: args.to,
           type: args.type,
           evidence: args.evidence,
+          evidence_mode: args.evidence_mode,
           created_by: args.created_by,
           from_paths: args.from_paths,
           to_paths: args.to_paths,

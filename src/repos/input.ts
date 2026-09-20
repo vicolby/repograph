@@ -108,6 +108,27 @@ export function optionalRelationDirection(
   return value;
 }
 
+/** Evidence write mode for `add_relation`: accumulate or overwrite. */
+export type EvidenceMode = "append" | "replace";
+
+/**
+ * Validates an optional evidence write mode; returns `"append"` when omitted.
+ * Anything outside `append`/`replace` (including non-strings) throws.
+ */
+export function optionalEvidenceMode(
+  value: unknown,
+  tool: string,
+  field: string,
+): EvidenceMode {
+  if (value === undefined) return "append";
+  if (value !== "append" && value !== "replace") {
+    throw new Error(
+      `${tool} field ${JSON.stringify(field)} must be one of "append" or "replace" when provided`,
+    );
+  }
+  return value;
+}
+
 /**
  * Validates an optional per-side file-scope hint list (`from_paths`/`to_paths`).
  *

@@ -226,5 +226,54 @@ defineGraphSuite(
         await client.close();
       }
     });
+    it("serves add_relation evidence_mode replace through the wire", async () => {
+      const client = await newClient();
+      try {
+        const first = parseCall(
+          await client.callTool("add_relation", {
+            from: "group/service-a",
+            to: "group/service-b",
+            type: "depends_on",
+            evidence: ["keep me", "stale entry"],
+          }),
+        );
+        expect(first.isError).toBe(false);
+
+        const fixed = parseCall(
+          await client.callTool("add_relation", {
+            from: "group/service-a",
+            to: "group/service-b",
+            type: "depends_on",
+            evidence: ["keep me"],
+            evidence_mode: "replace",
+          }),
+        );
+        expect(fixed.isError).toBe(false);
+        expect((fixed.body as ToolSuccess<{ evidence: string[] }>).data.evidence).toEqual([
+          "keep me",
+        ]);
+
+        // Unknown enum values are rejected either by the zod transport schema
+        // (protocol error) or by the domain seam (INVALID_INPUT envelope).
+        let invalidFailed = false;
+        try {
+          const invalid = parseCall(
+            await client.callTool("add_relation", {
+              from: "group/service-a",
+              to: "group/service-b",
+              type: "depends_on",
+              evidence: ["e"],
+              evidence_mode: "merge",
+            }),
+          );
+          invalidFailed = invalid.isError === true;
+        } catch {
+          invalidFailed = true;
+        }
+        expect(invalidFailed).toBe(true);
+      } finally {
+        await client.close();
+      }
+    });
   },
 );
