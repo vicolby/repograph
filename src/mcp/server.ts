@@ -66,7 +66,7 @@ async function runTool<T>(work: () => Promise<T>): Promise<CallToolResult> {
 }
 
 /**
- * Registers all five tools on `server`. The single place tools meet the SDK;
+ * Registers all six tools on `server`. The single place tools meet the SDK;
  * adding a tool is adding a `registerTool` call here. Every schema is a
  * concrete `z.object`, so `args` in each handler is inferred precisely —
  * no union, no type erasure, no casts.
@@ -105,7 +105,9 @@ export function registerAll(server: McpServer, store: RepoStore): void {
       description:
         "Record that one repository is connected to another. Creates a directed edge between two " +
         "existing repos, or appends evidence to the existing edge when the same (from, to, type) " +
-        "triple is recorded again. from/to accept a git remote URL (SSH or HTTPS) or an " +
+        "triple is recorded again. Optional from_paths/to_paths carry per-side file-scope hints " +
+        "(repo-root-relative paths, globs allowed): omitted preserves, [] clears, otherwise " +
+        "appended with dedup. from/to accept a git remote URL (SSH or HTTPS) or an " +
         "already-normalized path (group/subgroup/project).",
       inputSchema: z.object({
         from: z
@@ -123,6 +125,19 @@ export function registerAll(server: McpServer, store: RepoStore): void {
           .array(z.string())
           .describe("Sources/citations the relation was derived from (file/line references, quotes)"),
         created_by: z.string().nullable().optional().describe("Who/what recorded the relation"),
+        from_paths: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Optional file-scope hints for the from repo (repo-root-relative paths, * / ** / ? globs allowed). " +
+              "Omitted preserves the stored side; explicit [] clears it; otherwise appended with dedup.",
+          ),
+        to_paths: z
+          .array(z.string())
+          .optional()
+          .describe(
+            "Optional file-scope hints for the to repo. Same write semantics as from_paths.",
+          ),
       }),
     },
     (args) =>
@@ -133,6 +148,8 @@ export function registerAll(server: McpServer, store: RepoStore): void {
           type: args.type,
           evidence: args.evidence,
           created_by: args.created_by,
+          from_paths: args.from_paths,
+          to_paths: args.to_paths,
         }),
       ),
   );
@@ -212,6 +229,49 @@ export function registerAll(server: McpServer, store: RepoStore): void {
         store.getRelatedRepos({
           repo: args.repo,
           depth: args.depth,
+          type: args.type,
+          include_superseded: args.include_superseded,
+        }),
+      ),
+  );
+
+  server.registerTool(
+    "get_relations",
+    {
+      description:
+        "List relation edges incident to the given repository, together with their per-side " +
+        "file-scope hints (from_paths/to_paths) for scoping the next search. Direction selects " +
+        "outgoing (out), incoming (in), or all (both, default) incident edges; type restricts " +
+        "to edges of that free-text relation type. repo accepts a git remote URL (SSH or HTTPS) " +
+        "or an already-normalized path (group/subgroup/project).",
+      inputSchema: z.object({
+        repo: z
+          .string()
+          .describe(
+            "Repository identifier: git remote URL (SSH or HTTPS) or GitLab full path (group/subgroup/project)",
+          ),
+        direction: z
+          .enum(["out", "in", "both"])
+          .optional()
+          .describe("Which incident edges to return: out, in, or both (default both)"),
+        type: z
+          .string()
+          .nullable()
+          .optional()
+          .describe("Only return edges whose relation type equals this value"),
+        include_superseded: z
+          .boolean()
+          .optional()
+          .describe(
+            "When true, return superseded (retracted) edges as well; default false hides history",
+          ),
+      }),
+    },
+    (args) =>
+      runTool(() =>
+        store.getRelations({
+          repo: args.repo,
+          direction: args.direction,
           type: args.type,
           include_superseded: args.include_superseded,
         }),

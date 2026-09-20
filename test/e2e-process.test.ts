@@ -178,6 +178,7 @@ describe("e2e process/stdio (real Neo4j, spawned dist)", () => {
         "add_relation",
         "add_repo",
         "get_related_repos",
+        "get_relations",
         "search_repos",
         "supersede_relation",
       ]);
@@ -194,14 +195,32 @@ describe("e2e process/stdio (real Neo4j, spawned dist)", () => {
 
       const rel = await s.req("tools/call", {
         name: "add_relation",
-        arguments: { from: A, to: B, type: "depends_on", evidence: ["e2e probe"] },
+        arguments: {
+          from: A,
+          to: B,
+          type: "depends_on",
+          evidence: ["e2e probe"],
+          from_paths: ["src/a.ts"],
+          to_paths: ["lib/b.ts"],
+        },
       });
       expect(rel.isError ?? false).toBe(false);
-      expect((parseBody(rel) as { data: { type: string } }).data.type).toBe("depends_on");
+      expect(parseBody(rel)).toMatchObject({
+        data: { type: "depends_on", from_paths: ["src/a.ts"], to_paths: ["lib/b.ts"] },
+      });
 
       const trav = await s.req("tools/call", { name: "get_related_repos", arguments: { repo: A } });
       expect(trav.isError ?? false).toBe(false);
       expect((parseBody(trav) as { data: Array<{ path: string }> }).data.map((n) => n.path)).toContain(B);
+
+      const edges = await s.req("tools/call", {
+        name: "get_relations",
+        arguments: { repo: A, direction: "out" },
+      });
+      expect(edges.isError ?? false).toBe(false);
+      expect(parseBody(edges)).toMatchObject({
+        data: [{ from: A, to: B, from_paths: ["src/a.ts"], to_paths: ["lib/b.ts"] }],
+      });
 
       const search = await s.req("tools/call", { name: "search_repos", arguments: { query: "e2e" } });
       expect(search.isError ?? false).toBe(false);
@@ -217,6 +236,19 @@ describe("e2e process/stdio (real Neo4j, spawned dist)", () => {
       const travAfter = await s.req("tools/call", { name: "get_related_repos", arguments: { repo: A } });
       expect(travAfter.isError ?? false).toBe(false);
       expect((parseBody(travAfter) as { data: unknown[] }).data).toHaveLength(0);
+
+      const edgesAfter = await s.req("tools/call", { name: "get_relations", arguments: { repo: A } });
+      expect(edgesAfter.isError ?? false).toBe(false);
+      expect((parseBody(edgesAfter) as { data: unknown[] }).data).toHaveLength(0);
+
+      const edgesHistory = await s.req("tools/call", {
+        name: "get_relations",
+        arguments: { repo: A, include_superseded: true },
+      });
+      expect(edgesHistory.isError ?? false).toBe(false);
+      expect(parseBody(edgesHistory)).toMatchObject({
+        data: [{ from: A, to: B, from_paths: ["src/a.ts"], to_paths: ["lib/b.ts"] }],
+      });
 
       const bad = await s.req("tools/call", { name: "add_repo", arguments: { repo: "   " } });
       expect(bad.isError).toBe(true);
