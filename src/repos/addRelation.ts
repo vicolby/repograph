@@ -2,6 +2,7 @@ import type { Driver } from "neo4j-driver";
 import { ensureRepoConstraints, ensureReposExist, mapRelationEdge, withSession } from "./db.js";
 // Internal to the src/repos/ module (see store.ts): do not import from outside src/repos/.
 import {
+  optionalEvidenceMode,
   optionalPathHintList,
   optionalText,
   requiredText,
@@ -18,6 +19,12 @@ export type AddRelationInput = {
   type: string;
   /** Sources/citations the relation was derived from. Must be non-empty. */
   evidence: string[];
+  /**
+   * How to apply `evidence` on an existing triple: `append` (default)
+   * accumulates, `replace` overwrites the array wholesale (use with the
+   * filtered list to fix a typo or drop a stale entry).
+   */
+  evidence_mode?: "append" | "replace" | undefined;
   /** Who/what created the relation. Optional; preserved when omitted on repeat calls. */
   created_by?: string | null | undefined;
   /**
@@ -58,7 +65,9 @@ export type RelationEdge = {
  *   the free-text `type` is stored as a property so agents can introduce
  *   new types without schema/code changes.
  * - Existing triple: appends the new `evidence` to the edge's list and
- *   refreshes `created_at`, never duplicating the edge. `created_by` is
+ *   refreshes `created_at`, never duplicating the edge. Pass
+ *   `evidence_mode: "replace"` to overwrite the array wholesale instead
+ *   (fix a typo, drop a stale/test entry). `created_by` is
  *   updated only when a new value is passed. Hint sides (`from_paths`,
  *   `to_paths`) follow omit-preserves / explicit-empty-clears / otherwise
  *   append-with-dedup (exact, case-sensitive, order-preserving). A previously
@@ -75,6 +84,7 @@ export async function addRelation(
   const toPath = resolveRepoPath(input.to, "add_relation", "to");
   const type = requiredText(input.type, "add_relation", "type");
   const evidence = requiredTextList(input.evidence, "add_relation", "evidence");
+  const evidenceMode = optionalEvidenceMode(input.evidence_mode, "add_relation", "evidence_mode");
   const createdBy = optionalText(input.created_by, "add_relation", "created_by");
   const fromPaths = optionalPathHintList(input.from_paths, "add_relation", "from_paths");
   const toPaths = optionalPathHintList(input.to_paths, "add_relation", "to_paths");
@@ -91,7 +101,7 @@ export async function addRelation(
          r.superseded_at = NULL, r.superseded_by = NULL,
          r.from_paths = coalesce($fromPaths, []), r.to_paths = coalesce($toPaths, [])
        ON MATCH SET
-         r.evidence = coalesce(r.evidence, []) + $evidence,
+         r.evidence = CASE WHEN $evidenceMode = 'replace' THEN $evidence ELSE coalesce(r.evidence, []) + $evidence END,
          r.created_by = CASE WHEN $createdBy IS NOT NULL THEN $createdBy ELSE r.created_by END,
          r.created_at = $now,
          r.superseded_at = NULL,
@@ -106,7 +116,7 @@ export async function addRelation(
          r.evidence AS evidence, r.created_by AS created_by, r.created_at AS created_at,
          r.superseded_at AS superseded_at, r.superseded_by AS superseded_by,
          r.from_paths AS from_paths, r.to_paths AS to_paths`,
-      { fromPath, toPath, type, evidence, createdBy, now, fromPaths: fromPaths ?? null, toPaths: toPaths ?? null },
+      { fromPath, toPath, type, evidence, evidenceMode, createdBy, now, fromPaths: fromPaths ?? null, toPaths: toPaths ?? null },
     );
     const record = result.records[0];
     if (!record) {
