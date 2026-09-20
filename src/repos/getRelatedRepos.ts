@@ -1,7 +1,7 @@
 import type { Driver } from "neo4j-driver";
 import type { RepoNode } from "./addRepo.js";
 import { ensureRepoExists, mapRepoNode, withSession } from "./db.js";
-import { optionalBoolean, optionalIntInRange, optionalText, resolveRepoPath } from "./input.js";
+import { optionalBoolean, optionalIntInRange, optionalText, resolveRepoIdentifier } from "./input.js";
 // Internal to the src/repos/ module (see store.ts): do not import from outside src/repos/.
 
 export type GetRelatedReposInput = {
@@ -40,7 +40,9 @@ const MAX_DEPTH = 10;
  *   any hop traverses a superseded edge.
  * - Results are deduplicated, ordered by `path`, and never include the
  *   start repo itself (even when a cycle leads back to it).
- * - Throws when the start repo does not exist yet (call `add_repo` first),
+ * - Throws NOT_FOUND when the start repo does not exist: the message
+ *   names `search_repos` and, for a bare short name, the candidate full
+ *   paths. A bare short name auto-resolves when unambiguous,
  *   consistent with `add_relation`'s endpoint check.
  */
 export async function getRelatedRepos(
@@ -48,7 +50,7 @@ export async function getRelatedRepos(
   database: string,
   input: GetRelatedReposInput,
 ): Promise<RepoNode[]> {
-  const repoPath = resolveRepoPath(input.repo, "get_related_repos", "repo");
+  const repoRef = resolveRepoIdentifier(input.repo, "get_related_repos", "repo");
   const depth = optionalIntInRange(
     input.depth,
     "get_related_repos",
@@ -66,7 +68,7 @@ export async function getRelatedRepos(
   );
 
   return withSession(driver, database, async (session) => {
-    await ensureRepoExists(session, repoPath, "get_related_repos");
+    const repoPath = await ensureRepoExists(session, repoRef, "get_related_repos");
 
     // `depth` is a validated integer, so interpolating it into the
     // variable-length pattern is safe (Cypher has no parameter for it).

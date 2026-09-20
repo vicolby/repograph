@@ -1,4 +1,4 @@
-import { normalizeRepoIdentifier } from "./normalize.js";
+import { normalizeRepoIdentifier, type NormalizedRepo } from "./normalize.js";
 
 // Internal to the src/repos/ module (see store.ts): do not import from outside src/repos/.
 
@@ -53,6 +53,15 @@ export function requiredTextList(value: unknown, tool: string, field: string): s
  */
 export function resolveRepoPath(raw: unknown, tool: string, field: string): string {
   return normalizeRepoIdentifier(requiredText(raw, tool, field)).path;
+}
+
+/**
+ * Resolves a repository identifier to the full normalized record,
+ * preserving `isShortName`/`wasUrl` so the db layer can suffix-match a
+ * bare short name or emit a `search_repos` hint on a miss.
+ */
+export function resolveRepoIdentifier(raw: unknown, tool: string, field: string): NormalizedRepo {
+  return normalizeRepoIdentifier(requiredText(raw, tool, field));
 }
 
 /** Validates an optional integer field; returns `defaultValue` when omitted. */

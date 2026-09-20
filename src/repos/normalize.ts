@@ -8,6 +8,12 @@ export type NormalizedRepo = {
   wasUrl: boolean;
   /** Lowercased hostname the URL was derived from (or the default host for plain paths). */
   host: string;
+  /**
+   * True when the input was a plain path without any `/` (a bare short
+   * name such as `my-project`). Only plain short names are eligible for
+   * suffix-match resolution in `db.ts`; URL inputs never auto-resolve.
+   */
+  isShortName: boolean;
 };
 
 const DEFAULT_HOST = "gitlab.com";
@@ -57,7 +63,7 @@ export function normalizeRepoIdentifier(input: string, defaultHost: string = DEF
     if (!isValidPath(path)) {
       throw new Error(`invalid repository identifier: ${JSON.stringify(input)}`);
     }
-    return { path, canonicalUrl: `https://${host}/${path}`, wasUrl: true, host };
+    return { path, canonicalUrl: `https://${host}/${path}`, wasUrl: true, host, isShortName: false };
   }
 
   // URL forms: https://, http://, ssh://, git:// (also handles SSH URLs
@@ -77,14 +83,16 @@ export function normalizeRepoIdentifier(input: string, defaultHost: string = DEF
     if (!isValidPath(path)) {
       throw new Error(`invalid repository identifier: ${JSON.stringify(input)}`);
     }
-    return { path, canonicalUrl: `https://${host}/${path}`, wasUrl: true, host };
+    return { path, canonicalUrl: `https://${host}/${path}`, wasUrl: true, host, isShortName: false };
   }
 
-  // Plain GitLab full path.
+  // Plain GitLab full path. Single-segment inputs stay valid here on
+  // purpose: the db layer decides (suffix-match or a search_repos hint)
+  // instead of failing early in normalization (see Q9).
   const path = cleanPath(trimmed);
   if (trimmed.includes(":") || !isValidPath(path)) {
     throw new Error(`invalid repository identifier: ${JSON.stringify(input)}`);
   }
   const host = defaultHost.toLowerCase();
-  return { path, canonicalUrl: `https://${host}/${path}`, wasUrl: false, host };
+  return { path, canonicalUrl: `https://${host}/${path}`, wasUrl: false, host, isShortName: !path.includes("/") };
 }
